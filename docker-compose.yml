@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  backend: &backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: revolutionapi/tradebox
+    restart: on-failure
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    ports:
+      - "8006:8000"
+    command: uvicorn asgi:app --reload --host 0.0.0.0 --port 8000

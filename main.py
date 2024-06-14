@@ -14,3 +14,4 @@ async def receive_webhook(request: Request):
     tg.send_message(message=result)
 
     return result
+
