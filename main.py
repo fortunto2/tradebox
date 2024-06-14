@@ -52,12 +52,13 @@ async def receive_webhook(request: Request):
     qparams = request.query_params
     pparams = request.path_params
 
+    tg = TelegramClient()
+
     if 'text/plain' in request.headers['content-type']:
         body = await request.body()
         body = body.decode('utf-8')
         logging.info(f"Received webhook text payload: {body}")
 
-        tg = TelegramClient()
         tg.send_message(message=body)
 
         return {"status": "success"}
@@ -92,10 +93,9 @@ async def receive_webhook(request: Request):
         "leverage": validated_payload.open.leverage,
     }
 
-    tg = TelegramClient()
-    tg.send_message(message=positions)
+    tg.send_message(message=str(positions))
 
-    return {"status": "success"}
+    return {"status": "success", "data": positions}
 
         # except Exception as e:
         #     logging.error(f"An error occurred: {e}")
