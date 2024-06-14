@@ -16,14 +16,14 @@ logging.basicConfig(level=logging.INFO)
 class OpenOrder(BaseModel):
     enabled: bool
     amountType: str
-    amount: str
-    leverage: str
+    amount: float
+    leverage: int
 
 
 class DCAOrder(BaseModel):
     enabled: bool
     amountType: str
-    amount: str
+    amount: float
 
 
 class WebhookPayload(BaseModel):
@@ -97,6 +97,6 @@ async def receive_webhook(request: Request):
 
     return {"status": "success", "data": positions}
 
-        # except Exception as e:
-        #     logging.error(f"An error occurred: {e}")
-        #     raise HTTPException(status_code=500, detail="Internal server error")
+    # except Exception as e:
+    #     logging.error(f"An error occurred: {e}")
+    #     raise HTTPException(status_code=500, detail="Internal server error")
