@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from fastapi import FastAPI, Request, HTTPException
 import logging
 
@@ -16,14 +18,14 @@ logging.basicConfig(level=logging.INFO)
 class OpenOrder(BaseModel):
     enabled: bool
     amountType: str
-    amount: float
+    amount: Decimal
     leverage: int
 
 
 class DCAOrder(BaseModel):
     enabled: bool
     amountType: str
-    amount: float
+    amount: Decimal
 
 
 class WebhookPayload(BaseModel):
@@ -89,7 +91,7 @@ async def receive_webhook(request: Request):
     positions[symbol] = {
         "side": validated_payload.side,
         "symbol": validated_payload.symbol,
-        "amount": validated_payload.open.amount,
+        "amount": str(validated_payload.open.amount),
         "leverage": validated_payload.open.leverage,
     }
 
