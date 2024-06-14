@@ -13,4 +13,4 @@ services:
       - .env
     ports:
       - "8006:8000"
-    command: uvicorn asgi:app --reload --host 0.0.0.0 --port 8000
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
