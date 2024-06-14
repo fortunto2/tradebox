@@ -57,6 +57,9 @@ async def receive_webhook(request: Request):
         body = body.decode('utf-8')
         logging.info(f"Received webhook text payload: {body}")
 
+        tg = TelegramClient()
+        tg.send_message(message=body)
+
         return {"status": "success"}
 
     elif 'application/json' in request.headers['content-type']:
