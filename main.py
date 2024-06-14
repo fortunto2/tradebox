@@ -46,8 +46,19 @@ logging.basicConfig(level=logging.INFO)
 
 @app.post("/webhook")
 async def receive_webhook(request: Request):
-    try:
+    print(request.__dict__)
+
+    body = await request.body()
+    print(body)
+    headers = request.headers
+    qparams = request.query_params
+    pparams = request.path_params
+
+    if 'text/plain' in headers['content-type']:
+        raise ValueError('Alert Message must be of type application/json')
+    elif 'application/json' in headers['content-type']:
         payload = await request.json()
+
         logging.info(f"Received webhook payload: {payload}")
 
         try:
@@ -79,6 +90,6 @@ async def receive_webhook(request: Request):
 
         return {"status": "success"}
 
-    except Exception as e:
-        logging.error(f"An error occurred: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        # except Exception as e:
+        #     logging.error(f"An error occurred: {e}")
+        #     raise HTTPException(status_code=500, detail="Internal server error")
