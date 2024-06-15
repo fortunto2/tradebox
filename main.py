@@ -13,29 +13,32 @@ import requests
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
-
-# Define Pydantic models for webhook validation
 class OpenOrder(BaseModel):
     enabled: bool
     amountType: str
     amount: Decimal
     leverage: int
 
-
-class DCAOrder(BaseModel):
-    enabled: bool
-    amountType: str
-    amount: Decimal
-
+class Settings(BaseModel):
+    deposit: Decimal
+    extramarg: Decimal
+    tp: Decimal
+    trail_1: Decimal
+    trail_2: Decimal
+    offset_short: Decimal
+    sl_short: Decimal
+    grid_long: str
+    mg_long: str
+    trail_step: Decimal
+    order_quan: int
 
 class WebhookPayload(BaseModel):
     name: str
-    secret: str
     side: str
     positionSide: str
     symbol: str
     open: OpenOrder
-    dca: DCAOrder
+    settings: Settings
 
 
 # Global state to keep track of open positions
