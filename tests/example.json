@@ -1,0 +1,25 @@
+{
+  "name": "key",
+  "side": "buy",
+  "positionSide": "long",
+  "symbol": "BTCUSDT.P",
+  "open": {
+    "enabled": true,
+    "amountType": "amount",
+    "amount": "0.002264",
+    "leverage": "10"
+  },
+  "settings": {
+    "deposit": "250",
+    "extramarg": "250",
+    "tp": "1.35",
+    "trail_1": "0.23",
+    "trail_2": "0.08",
+    "offset_short": "0.5",
+    "sl_short": "0.5",
+    "grid_long": "1.09|0.87|1.95|2.82|4.77",
+    "mg_long": "24.4|33.16|44.02|57.77|75.37",
+    "trail_step": "0.01",
+    "order_quan": "5"
+  }
+}

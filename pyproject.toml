@@ -11,7 +11,11 @@ fastapi = "^0.111.0"
 pydantic = "^2.7.4"
 binance-connector = "^3.7.0"
 requests = "^2.32.3"
+pydantic-settings = "^2.3.3"
 
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2.2"
 
 [build-system]
 requires = ["poetry-core"]
