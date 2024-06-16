@@ -50,6 +50,22 @@ requests = ">=2.31.0"
 websocket-client = ">=1.6.3"
 
 [[package]]
+name = "binance-futures-connector"
+version = "4.0.0"
+description = "This is a lightweight library that works as a connector to Binance Futures public API."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "binance-futures-connector-4.0.0.tar.gz", hash = "sha256:8c6bd44d071c563a0329f37d192bcae160c6f614bc25a04c9cc6abc97e43606b"},
+    {file = "binance_futures_connector-4.0.0-py3-none-any.whl", hash = "sha256:e61fd1eb61180b055d650377f70e1f219f443876ea57efe9fdb2bfa4e2137738"},
+]
+
+[package.dependencies]
+pycryptodome = ">=3.15.0"
+requests = ">=2.25.1"
+websocket-client = ">=1.5.0"
+
+[[package]]
 name = "certifi"
 version = "2024.6.2"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -1376,4 +1392,4 @@ files = [
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "ff71cd6ea0ab35891820c5bb98a84b6945b6413322c4b8cc8786862b64c4c321"
+content-hash = "a6f9fd6237f0ef14c7c10372690adef369ac6ac458b278c3206af3cf2997f6ae"

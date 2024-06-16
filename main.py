@@ -4,8 +4,7 @@ from pydantic import BaseModel, ValidationError
 import logging
 from decimal import Decimal, ROUND_DOWN
 from typing import List
-from binance.spot import Spot
-from binance.websocket.spot.websocket_stream import SpotWebsocketStreamClient
+
 import asyncio
 
 from starlette.responses import JSONResponse
@@ -17,11 +16,7 @@ from config import settings
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
-# Binance API credentials (replace with your own)
-
-
-client = Spot(api_key=settings.BINANCE_API_KEY, api_secret=settings.BINANCE_API_SECRET)
-ws_client = SpotWebsocketStreamClient()
+from core.binance_futures import client
 
 # Global state to keep track of open positions
 positions = {}
@@ -36,15 +31,47 @@ def get_current_price(symbol: str) -> Decimal:
         raise HTTPException(status_code=500, detail="Failed to get current price")
 
 
-async def create_order(order):
+async def create_order_spot(order):
     """
-    https://binance-docs.github.io/apidocs/spot/en/#new-order-trade
+    features: https://binance-docs.github.io/apidocs/futures/en/#new-order-trade
+
     :param order:
     :return:
     """
 
     try:
         # todo: надо достовать количество знаков после запятой из бинанс для каждого тикера
+        quantity = Decimal(order["quantity"]).quantize(Decimal('1.00000000'), rounding=ROUND_DOWN)
+        price = Decimal(order["price"]).quantize(Decimal('1.00000000'), rounding=ROUND_DOWN)
+
+        quantity = float(quantity)
+        price = float(price)
+
+        response = client.new_order(
+            symbol=order["symbol"],
+            type='MARKET',
+            quantity=quantity,
+            # positionSide='LONG',
+            side=order["side"],
+            # price=price
+        )
+
+        logging.info(f"Order created successfully: {response}")
+        return response['orderId']
+    except Exception as e:
+        logging.error(f"Failed to create order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create order")
+
+
+async def create_order_futures(order):
+    """
+    https://binance-docs.github.io/apidocs/futures/en/#new-order-trade
+
+    :param order:
+    :return:
+    """
+
+    try:
         quantity = Decimal(order["quantity"]).quantize(Decimal('1.00000000'), rounding=ROUND_DOWN)
         price = Decimal(order["price"]).quantize(Decimal('1.00000000'), rounding=ROUND_DOWN)
 
@@ -67,21 +94,23 @@ async def create_order(order):
         raise HTTPException(status_code=500, detail="Failed to create order")
 
 
-async def monitor_order(symbol, order_id):
-    loop = asyncio.get_event_loop()
-    event = asyncio.Event()
 
-    def handle_message(_, message):
-        if message['e'] == 'executionReport' and message['i'] == order_id:
-            if message['X'] == 'FILLED':
-                logging.info(f"Order {order_id} filled.")
-                event.set()
 
-    ws_client.start()
-    ws_client.user_data(handle_message)
-    await event.wait()
-    ws_client.stop()
-
+# async def monitor_order(symbol, order_id):
+#     loop = asyncio.get_event_loop()
+#     event = asyncio.Event()
+#
+#     def handle_message(_, message):
+#         if message['e'] == 'executionReport' and message['i'] == order_id:
+#             if message['X'] == 'FILLED':
+#                 logging.info(f"Order {order_id} filled.")
+#                 event.set()
+#
+#     ws_client.start()
+#     ws_client.user_data(handle_message)
+#     await event.wait()
+#     ws_client.stop()
+#
 
 async def create_orders(payload: WebhookPayload, current_price: Decimal):
     orders = []
@@ -111,8 +140,8 @@ async def create_orders(payload: WebhookPayload, current_price: Decimal):
             })
 
     for order in orders:
-        order_id = await create_order(order)
-        await monitor_order(order["symbol"], order_id)
+        order_id = await create_order_futures(order)
+        # await monitor_order(order["symbol"], order_id)
 
 
 @app.post("/webhook/test")
