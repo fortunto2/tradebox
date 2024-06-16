@@ -13,7 +13,7 @@ client = UMFutures()
 print(client.time())
 client = UMFutures(key=settings.BINANCE_API_KEY, secret=settings.BINANCE_API_SECRET)
 # Get account information
-print(client.account())
+# print(client.account())
 
 
 @lru_cache()

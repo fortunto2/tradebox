@@ -80,7 +80,7 @@ async def create_order_futures(order):
             quantity=quantity,
             positionSide='LONG',
             side=order["side"],
-            price=price
+            # price=price
         )
 
         logging.info(f"Order created successfully: {response}")
