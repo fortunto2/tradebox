@@ -29,7 +29,7 @@ from decimal import Decimal, ROUND_DOWN
 
 
 def adjust_precision(value, precision):
-    quantize_str = '1.' + '0' * precision
+    quantize_str = '1.' + '0' * precision if precision > 0 else '1'
     return value.quantize(Decimal(quantize_str), rounding=ROUND_DOWN)
 
 
@@ -39,7 +39,7 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity):
     if not symbol_info:
         raise ValueError(f"Symbol {symbol} not found in exchange info")
 
-    quantity_precision = 8
+    quantity_precision = 0
     price_precision = 8
 
     for filter in symbol_info['filters']:
@@ -51,7 +51,7 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity):
     print("quantity_precision: ", quantity_precision)
     print("price_precision : ", price_precision)
 
-    price = client.ticker_price(symbol)
+    price = client.ticker_price(symbol).get('price')
     print(price)
 
     # Приведение quantity и price к Decimal и корректировка точности
