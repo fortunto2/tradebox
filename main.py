@@ -24,7 +24,7 @@ positions = {}
 
 def get_current_price(symbol: str) -> Decimal:
     try:
-        ticker = client.avg_price(symbol)
+        ticker = client.ticker_price(symbol)
         return Decimal(ticker.get('price'))
     except Exception as e:
         logging.error(f"Failed to get current price: {e}")
