@@ -1,0 +1,26 @@
+{
+  "name": "APIKEY",
+  "side": "buy",
+  "positionSide": "long",
+  "symbol": "JOEUSDT",
+  "open": {
+    "enabled": true,
+    "amountType": "amount",
+    "amount": "60",
+    "leverage": "20"
+  },
+  "settings": {
+    "deposit": "35",
+    "extramarg": "35",
+    "tp": "0.42",
+    "trail_1": "0.03",
+    "trail_2": "0.01",
+    "offset_short": "0.5",
+    "sl_short": "0.5",
+    "grid_long": "0.36|0.29|0.65|0.94|1.58",
+    "mg_long": "33.3|45.26|61.03|81.98|109.9",
+    "trail_step": "0.01",
+    "order_quan": "5",
+    "sens": "252"
+  }
+}

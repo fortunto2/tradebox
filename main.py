@@ -54,10 +54,10 @@ async def create_order(order):
         response = client.new_order(
             symbol=order["symbol"],
             type='MARKET',
-            # quantity=quantity,
-            # positionSide='LONG',
+            quantity=quantity,
+            positionSide='LONG',
             side=order["side"],
-            # price=price
+            price=price
         )
 
         logging.info(f"Order created successfully: {response}")

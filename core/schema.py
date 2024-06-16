@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import List, Union, Literal
+from typing import List, Union, Literal, Optional
 
 from pydantic import BaseModel, validator, field_validator
 
@@ -24,6 +24,7 @@ class Settings(BaseModel):
     mg_long: Union[str, List[float]]
     trail_step: float
     order_quan: int
+    sens: Optional[int]
 
     @field_validator('grid_long', 'mg_long', mode='before')
     def split_string_to_list(cls, v):
