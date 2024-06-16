@@ -16,7 +16,7 @@ from config import settings
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
-from core.binance_futures import client
+from core.binance_futures import client, get_symbol_price_and_quantity_by_precisions
 
 # Global state to keep track of open positions
 positions = {}
@@ -72,11 +72,7 @@ async def create_order_futures(order):
     """
 
     try:
-        quantity = Decimal(order["quantity"]).quantize(Decimal('1.00000000'), rounding=ROUND_DOWN)
-        price = Decimal(order["price"]).quantize(Decimal('1.00000000'), rounding=ROUND_DOWN)
-
-        quantity = float(quantity)
-        price = float(price)
+        quantity, price = get_symbol_price_and_quantity_by_precisions(order["symbol"], order["quantity"])
 
         response = client.new_order(
             symbol=order["symbol"],
