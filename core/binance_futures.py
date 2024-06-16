@@ -39,14 +39,17 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity):
     if not symbol_info:
         raise ValueError(f"Symbol {symbol} not found in exchange info")
 
+    quantity_precision = 8
+    price_precision = 8
+
     for filter in symbol_info['filters']:
         if filter['filterType'] == 'LOT_SIZE':
             quantity_precision = int(filter['stepSize'].find('1') - 1)
         if filter['filterType'] == 'PRICE_FILTER':
             price_precision = int(filter['tickSize'].find('1') - 1)
 
-        print("quantity_precision: ", quantity_precision)
-        print("price_precision : ", price_precision)
+    print("quantity_precision: ", quantity_precision)
+    print("price_precision : ", price_precision)
 
     price = client.ticker_price(symbol)
     print(price)
