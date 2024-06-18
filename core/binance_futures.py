@@ -158,7 +158,7 @@ def get_current_price(symbol: str) -> Decimal:
         raise HTTPException(status_code=500, detail="Failed to get current price")
 
 
-def on_message(msg):
+def on_message(ws, msg):
     logging.info(f"Received message: {msg}")
     if msg['e'] == 'ORDER_TRADE_UPDATE':
         order_status = msg['o']['X']
@@ -167,17 +167,25 @@ def on_message(msg):
             logging.info(f"Order completed with status: {order_status}")
 
 
+
 def monitor_ws(symbol):
     from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
 
-    listen_key = client.new_listen_key()
+    listen_key = client.new_listen_key().get('listenKey')
     ws_client = UMFuturesWebsocketClient(on_message=on_message)
 
     # Подключаемся к WebSocket и подписываемся на данные пользователя
-    ws_client.user_data(listen_key)
-
-    # Запуск WebSocket клиента
-    ws_client.start()
+    ws_client.user_data(
+        listen_key=listen_key,
+        symbol=symbol
+    )
+    
+    # данные по цене
+    # ws_client.agg_trade(
+    #     symbol=symbol,
+    #     action=UMFuturesWebsocketClient.ACTION_SUBSCRIBE
+    #
+    # )
 
 
 
