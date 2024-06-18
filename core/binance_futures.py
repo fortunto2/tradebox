@@ -1,7 +1,11 @@
+import asyncio
 from functools import lru_cache
 
 from binance.um_futures import UMFutures
 import sys
+import logging
+
+from fastapi import HTTPException
 
 sys.path.append('..')
 sys.path.append('.')
@@ -14,6 +18,10 @@ print(client.time())
 client = UMFutures(key=settings.BINANCE_API_KEY, secret=settings.BINANCE_API_SECRET)
 # Get account information
 # print(client.account())
+
+from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
+
+ws_client = UMFuturesWebsocketClient()
 
 
 @lru_cache()
@@ -59,6 +67,73 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity):
     price = adjust_precision(Decimal(price), price_precision)
 
     return quantity, price
+
+
+async def create_order(order):
+    """
+    https://binance-docs.github.io/apidocs/futures/en/#new-order-trade
+
+    :param order:
+    :return:
+    """
+
+    try:
+        quantity, price = get_symbol_price_and_quantity_by_precisions(order["symbol"], order["quantity"])
+
+        response = client.new_order(
+            symbol=order["symbol"],
+            type='MARKET',
+            quantity=quantity,
+            positionSide='LONG',
+            side=order["side"],
+            # price=price
+        )
+
+        logging.info(f"Order created successfully: {response}")
+        return response['orderId']
+    except Exception as e:
+        logging.error(f"Failed to create order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create order")
+
+
+async def monitor_order(symbol, order_id=None):
+    """
+    Monitor an order status by its ID.
+
+    Order Status
+        NEW
+        PARTIALLY_FILLED
+        FILLED
+        CANCELED
+        EXPIRED
+        EXPIRED_IN_MATCH
+
+    :param symbol: The symbol of the order to monitor.
+    :param order_id: The ID of the order to monitor.
+    :return: The order status.
+    """
+    try:
+        while True:
+            order_status = client.get_open_orders(symbol=symbol, orderId=order_id)
+            logging.info(f"Order status: {order_status}")
+
+            if order_status['status'] in ['FILLED', 'CANCELED', 'REJECTED']:
+                logging.info(f"Order {order_id} is {order_status['status']}")
+                return order_status
+
+            await asyncio.sleep(1)  # Adjust the sleep interval as needed.
+    except Exception as e:
+        logging.error(f"Failed to monitor order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to monitor order")
+
+
+def get_current_price(symbol: str) -> Decimal:
+    try:
+        ticker = client.ticker_price(symbol)
+        return Decimal(ticker.get('price'))
+    except Exception as e:
+        logging.error(f"Failed to get current price: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get current price")
 
 
 if __name__ == "__main__":
