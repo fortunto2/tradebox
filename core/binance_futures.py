@@ -173,14 +173,11 @@ def monitor_ws(symbol):
     listen_key = client.new_listen_key()
     ws_client = UMFuturesWebsocketClient(on_message=on_message)
 
-    ws_client.subscribe(listen_key)
-
+    # Подключаемся к WebSocket и подписываемся на данные пользователя
     ws_client.user_data(listen_key)
 
-    ws_client.agg_trade(
-        symbol=symbol,
-        action=ws_client.ACTION_SUBSCRIBE
-    )
+    # Запуск WebSocket клиента
+    ws_client.start()
 
 
 
