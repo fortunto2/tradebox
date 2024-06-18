@@ -12,7 +12,7 @@ app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
 from core.binance_futures import client, get_symbol_price_and_quantity_by_precisions, ws_client, get_current_price, \
-    create_order, monitor_order
+    create_order, check_open_orders, wait_order
 
 # Global state to keep track of open positions
 positions = {}
@@ -26,9 +26,6 @@ async def create_orders(payload: WebhookPayload, current_price: Decimal):
 
     initial_quantity = payload.open.amount
     total_spent = 0
-
-    # firstly check existing orders
-    await monitor_order(payload.symbol)
 
     for i in range(settings.order_quan):
         if i < len(mg_long) and i < len(grid_long):
@@ -51,7 +48,7 @@ async def create_orders(payload: WebhookPayload, current_price: Decimal):
     for order in orders:
         print(order)
         order_id = await create_order(order)
-        await monitor_order(order["symbol"], order_id)
+        await wait_order(order["symbol"], order_id)
         break
 
 
@@ -61,21 +58,16 @@ async def receive_webhook(body: WebhookPayload):
 
     symbol = body.symbol
 
-    if symbol in positions:
-        logging.info(f"Position already open for symbol: {symbol}. Ignoring new webhook.")
-        return {"status": "ignored", "reason": "position already open"}
+    # firstly check existing orders
+    open_orders = await check_open_orders(symbol)
+    if open_orders:
+        logging.info(f"Open orders found for symbol: {symbol}. Ignoring new webhook.")
+        return {"status": "ignored", "reason": "open orders found"}
 
     current_price = get_current_price(symbol)
     logging.info(f"Current price for {symbol}: {current_price}")
 
     await create_orders(body, current_price)
-
-    positions[symbol] = {
-        "side": body.side,
-        "symbol": body.symbol,
-        "amount": str(body.open.amount),
-        "leverage": body.open.leverage,
-    }
 
     # Send the positions data as a string message to Telegram
     # tg = TelegramClient()
