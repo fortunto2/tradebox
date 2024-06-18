@@ -19,10 +19,6 @@ client = UMFutures(key=settings.BINANCE_API_KEY, secret=settings.BINANCE_API_SEC
 # Get account information
 # print(client.account())
 
-from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
-
-ws_client = UMFuturesWebsocketClient()
-
 
 @lru_cache()
 def get_symbol_info(symbol):
@@ -115,7 +111,7 @@ async def wait_order(symbol, order_id=None):
     try:
         while True:
             orders = client.get_orders(symbol=symbol)
-            
+
             for order in orders:
                 print(order)
                 if order['orderId'] == order_id:
@@ -162,7 +158,33 @@ def get_current_price(symbol: str) -> Decimal:
         raise HTTPException(status_code=500, detail="Failed to get current price")
 
 
+def on_message(msg):
+    logging.info(f"Received message: {msg}")
+    if msg['e'] == 'ORDER_TRADE_UPDATE':
+        order_status = msg['o']['X']
+        logging.info(f"Order status: {order_status}")
+        if order_status in ['FILLED', 'CANCELED', 'REJECTED']:
+            logging.info(f"Order completed with status: {order_status}")
+
+
+def monitor_ws(symbol):
+    from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
+
+    listen_key = client.new_listen_key()
+    ws_client = UMFuturesWebsocketClient(on_message=on_message)
+
+    ws_client.user_data(listen_key)
+
+    ws_client.agg_trade(
+        symbol=symbol,
+        action=ws_client.ACTION_SUBSCRIBE
+    )
+
+
+
 if __name__ == "__main__":
-    print(get_symbol_price_and_quantity_by_precisions("JOEUSDT", 0.0001))
-    print(get_symbol_price_and_quantity_by_precisions("JOEUSDT", 0.00000001))
-    print(get_symbol_price_and_quantity_by_precisions("JOEUSDT", 60))
+    # print(get_symbol_price_and_quantity_by_precisions("JOEUSDT", 0.0001))
+    # print(get_symbol_price_and_quantity_by_precisions("JOEUSDT", 0.00000001))
+    # print(get_symbol_price_and_quantity_by_precisions("JOEUSDT", 60))
+
+    monitor_ws("JOEUSDT")
