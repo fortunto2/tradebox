@@ -1,9 +1,13 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 import logging
 from decimal import Decimal, ROUND_DOWN
 from typing import List
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import SQLModel
 
+from core.create_orders import calculate_prices, create_orders_in_db
+from core.models.orders import Order
 from core.schema import WebhookPayload
 from tg_client import TelegramClient
 from config import settings
@@ -11,11 +15,19 @@ from config import settings
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
-from core.binance_futures import client, get_symbol_price_and_quantity_by_precisions, ws_client, get_current_price, \
+from core.binance_futures import get_current_price, \
     create_order, check_open_orders, wait_order
 
 # Global state to keep track of open positions
 positions = {}
+
+from core.db_async import async_session, async_engine, get_async_session
+
+
+@app.on_event("startup")
+async def on_startup():
+    async with async_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
 
 
 async def create_orders(payload: WebhookPayload, current_price: Decimal):
@@ -53,7 +65,7 @@ async def create_orders(payload: WebhookPayload, current_price: Decimal):
 
 
 @app.post("/webhook")
-async def receive_webhook(body: WebhookPayload):
+async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(get_async_session)):
     logging.info(f"Received webhook JSON payload: {body.json()}")
 
     symbol = body.symbol
@@ -67,7 +79,7 @@ async def receive_webhook(body: WebhookPayload):
     current_price = get_current_price(symbol)
     logging.info(f"Current price for {symbol}: {current_price}")
 
-    await create_orders(body, current_price)
+    await create_orders_in_db(body, current_price, session)
 
     # Send the positions data as a string message to Telegram
     # tg = TelegramClient()

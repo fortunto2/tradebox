@@ -8,11 +8,16 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+
+    DEBUG: bool = False
+
     BASE_DIR: str = os.path.dirname(os.path.realpath(__file__))
     ENVIRONMENT: str = "dev"
 
     BINANCE_API_KEY: str
     BINANCE_API_SECRET: str
+
+    DATABASE_URL: str = "sqlite+aiosqlite:///./test.db"
 
     class Config:
         case_sensitive = True

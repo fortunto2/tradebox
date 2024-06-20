@@ -13,6 +13,9 @@ binance-connector = "^3.7.0"
 requests = "^2.32.3"
 pydantic-settings = "^2.3.3"
 binance-futures-connector = "^4.0.0"
+sqlmodel = "^0.0.19"
+aiosqlite = "^0.20.0"
+greenlet = "^3.0.3"
 
 
 [tool.poetry.group.dev.dependencies]
