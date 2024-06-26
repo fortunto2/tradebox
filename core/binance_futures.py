@@ -128,6 +128,7 @@ async def wait_order(symbol):
 
 async def wait_order_id(symbol, order_id):
     try:
+        print(f"Monitoring order {symbol}: {order_id}")
         while True:
             orders = client.get_open_orders(symbol=symbol, order_id=order_id)
 
