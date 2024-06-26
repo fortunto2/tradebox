@@ -106,7 +106,7 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
     order_binance_id = await create_order_binance(first_order)
     first_order.binance_id = order_binance_id
 
-    position = check_position(symbol=payload.symbol, side=payload.side.value)
+    position = await check_position(symbol=payload.symbol, side=payload.side.value)
     if position:
         first_order.price = Decimal(position['entryPrice'])
 
