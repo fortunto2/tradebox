@@ -7,10 +7,9 @@ import logging
 
 from fastapi import HTTPException
 
-from core.models.orders import Order
-
 sys.path.append('..')
 sys.path.append('.')
+from core.models.orders import Order
 
 from config import settings
 
