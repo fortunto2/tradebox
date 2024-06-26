@@ -118,7 +118,7 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
     grid_orders = calculate_orders(payload, first_order.price)
 
     # Создание ордеров по мартигейлу и сетке
-    for index, price, quantity in enumerate(zip(grid_orders["long_orders"], grid_orders["martingale_orders"])):
+    for index, (price, quantity) in enumerate(zip(grid_orders["long_orders"], grid_orders["martingale_orders"])):
         print("-----------------")
 
         order = Order(
