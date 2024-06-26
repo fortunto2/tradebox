@@ -98,7 +98,7 @@ async def create_order_binance(order: Order):
         raise HTTPException(status_code=500, detail="Failed to create order")
 
 
-async def wait_order(symbol, order_id=None):
+async def wait_order(symbol):
     """
     Monitor an order status by its ID.
 
@@ -115,16 +115,28 @@ async def wait_order(symbol, order_id=None):
     :return: The order status.
     """
     try:
+        orders = client.get_orders(symbol=symbol)
+        if orders:
+            logging.info(f"Orders: {orders}")
+            return orders
+    except Exception as e:
+        logging.error(f"Failed to monitor order: {e}")
+        raise HTTPException(status_code=500, detail="Failed to monitor order")
+
+    return None
+
+
+async def wait_order_id(symbol, order_id):
+    try:
         while True:
-            orders = client.get_orders(symbol=symbol)
+            orders = client.get_open_orders(symbol=symbol, order_id=order_id)
 
             for order in orders:
                 print(order)
-                if order['orderId'] == order_id:
 
-                    if order['status'] in ['FILLED', 'CANCELED', 'REJECTED']:
-                        logging.info(f"Order {order_id} is {order['status']}")
-                        return order
+                if order['status'] in ['FILLED', 'CANCELED', 'REJECTED']:
+                    logging.info(f"Order {order_id} is {order['status']}")
+                    return order
 
             await asyncio.sleep(1)  # Adjust the sleep interval as needed.
     except Exception as e:
