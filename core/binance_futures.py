@@ -126,6 +126,100 @@ async def wait_order(symbol):
     return None
 
 
+async def check_position_side_dual() -> bool:
+
+    try:
+        dual_side_position = client.get_position_mode()
+
+        if dual_side_position:
+            logging.info(f"Position side dual: {dual_side_position}")
+            return True
+        else:
+            logging.info(f"No position side dual found")
+            r = client.change_position_mode(dualSidePosition=True)
+
+            if r['code'] == 200:
+                logging.info(f"Position side dual changed to True")
+            else:
+                logging.error(f"Не получилось сменить позицию, проверье настройки Binance!: {r}")
+                return False
+
+            # sleep1
+            await asyncio.sleep(1)
+            dual_side_position = client.get_position_mode()
+            logging.info(f"Position side dual: {dual_side_position}")
+
+            return True
+
+    except Exception as e:
+        logging.error(f"Failed to get position side dual: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get position side dual")
+
+
+async def check_position(symbol: str, side: str = 'LONG'):
+    "GET /fapi/v2/positionRisk"
+    """
+    https://binance-docs.github.io/apidocs/futures/en/#position-information-v2-user_data
+    
+    Result For Hedge position mode:
+
+[
+    {
+        "symbol": "BTCUSDT",
+        "positionAmt": "0.001",
+        "entryPrice": "22185.2",
+        "breakEvenPrice": "0.0",  
+        "markPrice": "21123.05052574",
+        "unRealizedProfit": "-1.06214947",
+        "liquidationPrice": "19731.45529116",
+        "leverage": "4",
+        "maxNotionalValue": "100000000",
+        "marginType": "cross",
+        "isolatedMargin": "0.00000000",
+        "isAutoAddMargin": "false",
+        "positionSide": "LONG",
+        "notional": "21.12305052",
+        "isolatedWallet": "0",
+        "updateTime": 1655217461579
+    },
+    {
+        "symbol": "BTCUSDT",
+        "positionAmt": "0.000",
+        "entryPrice": "0.0",
+        "breakEvenPrice": "0.0",  
+        "markPrice": "21123.05052574",
+        "unRealizedProfit": "0.00000000",
+        "liquidationPrice": "0",
+        "leverage": "4",
+        "maxNotionalValue": "100000000",
+        "marginType": "cross",
+        "isolatedMargin": "0.00000000",
+        "isAutoAddMargin": "false",
+        "positionSide": "SHORT",
+        "notional": "0",
+        "isolatedWallet": "0",
+        "updateTime": 0
+    }
+]
+"""
+
+    try:
+        positions = client.get_position_risk(symbol=symbol)
+        if positions:
+            logging.info(f"Position: {positions}")
+
+            # if LONG return entryPrice, with next
+            position = next((p for p in positions if p['positionSide'] == side), None)
+
+            return position
+
+    except Exception as e:
+        logging.error(f"Failed to get position: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get position")
+
+    return None
+
+
 async def wait_order_id(symbol, order_id):
     try:
         print(f"Monitoring order {symbol}: {order_id}")

@@ -6,6 +6,7 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
+from core.binance_futures import check_position_side_dual
 from core.create_orders import create_orders_in_db
 from core.models.webhook import WebHook
 from core.schema import WebhookPayload
@@ -22,6 +23,11 @@ from core.db_async import  async_engine, get_async_session
 async def on_startup():
     async with async_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+
+#     check dual mode
+    dual_mode = await check_position_side_dual()
+    if not dual_mode:
+        raise HTTPException(status_code=403, detail="Failed to set dual mode, check Binance settings!")
 
 
 @app.post("/webhook")
