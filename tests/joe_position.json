@@ -1,0 +1,42 @@
+[
+  {
+    "symbol": "JOEUSDT",
+    "positionAmt": "780",
+    "entryPrice": "0.3291538461538",
+    "breakEvenPrice": "0.3293184230769",
+    "markPrice": "0.33010000",
+    "unRealizedProfit": "0.73800480",
+    "liquidationPrice": "0.29708019",
+    "leverage": "20",
+    "maxNotionalValue": "5000",
+    "marginType": "cross",
+    "isolatedMargin": "0.00000000",
+    "isAutoAddMargin": "false",
+    "positionSide": "LONG",
+    "notional": "257.47800000",
+    "isolatedWallet": "0",
+    "updateTime": 1719429435123,
+    "isolated": false,
+    "adlQuantile": 4
+  },
+  {
+    "symbol": "JOEUSDT",
+    "positionAmt": "0",
+    "entryPrice": "0.0",
+    "breakEvenPrice": "0.0",
+    "markPrice": "0.33010000",
+    "unRealizedProfit": "0.00000000",
+    "liquidationPrice": "0",
+    "leverage": "20",
+    "maxNotionalValue": "5000",
+    "marginType": "cross",
+    "isolatedMargin": "0.00000000",
+    "isAutoAddMargin": "false",
+    "positionSide": "SHORT",
+    "notional": "0",
+    "isolatedWallet": "0",
+    "updateTime": 0,
+    "isolated": false,
+    "adlQuantile": 0
+  }
+]

@@ -127,7 +127,6 @@ async def wait_order(symbol):
 
 
 async def check_position_side_dual() -> bool:
-
     try:
         dual_side_position = client.get_position_mode()
 
@@ -259,7 +258,6 @@ async def check_open_orders(symbol):
     except Exception as e:
         logging.error(f"Failed to monitor order: {e}")
         raise HTTPException(status_code=500, detail="Failed to monitor order")
-
 
 
 def get_current_price(symbol: str) -> Decimal:
