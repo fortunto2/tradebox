@@ -16,6 +16,11 @@ class OrderStatus(enum.Enum):
     EXPIRED_IN_MATCH = "EXPIRED_IN_MATCH"
 
 
+class PositionSide(enum.Enum):
+    LONG = "LONG"
+    SHORT = "SHORT"
+
+
 class Order(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     symbol: str
@@ -23,5 +28,5 @@ class Order(SQLModel, table=True):
     price: Decimal
     quantity: Decimal
     leverage: int
-
+    position_side: PositionSide
     status: Optional[OrderStatus] = None

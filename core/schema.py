@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Union, Literal, Optional
 
@@ -14,6 +15,7 @@ class OpenOrder(BaseModel):
 
 class Settings(BaseModel):
     deposit: float
+    time_allert: datetime
     extramarg: float
     tp: float
     trail_1: float
@@ -25,6 +27,7 @@ class Settings(BaseModel):
     trail_step: float
     order_quan: int
     sens: Optional[int]
+    time_frame: Optional[str]
 
     @field_validator('grid_long', 'mg_long', mode='before')
     def split_string_to_list(cls, v):

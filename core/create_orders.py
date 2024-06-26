@@ -12,7 +12,7 @@ sys.path.append('.')
 from core.db_async import async_engine
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.models.orders import Order
+from core.models.orders import Order, PositionSide
 from core.schema import WebhookPayload
 
 
@@ -56,6 +56,8 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
     # Расчет стоп-лосса для короткой позиции
     stop_loss_short_order_price = short_order_price * Decimal(1 + stop_loss_short_percentage / 100)
 
+    short_order_amount = Decimal(payload.settings.extramarg * payload.open.leverage) / short_order_price
+
     # Проверка корректности данных для количества шагов Мартингейла и количества ордеров
     if len(martingale_steps) != order_quantity:
         raise ValueError("Количество данных в шагах Мартингейла не соответствует количеству ордеров order_quantity.")
@@ -74,7 +76,8 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
         "take_profit_order_price": take_profit_order_price,
         "long_orders": long_orders,
         "short_order_price": short_order_price,
-        "stop_loss_short_order_price": stop_loss_short_order_price,
+        "short_order_amount": short_order_amount,
+        "stop_loss_short_order_price": stop_loss_short_order_price, #считаем каждый раз после SHORT, после подтерждения что позиция открылась
         "martingale_orders": martingale_orders
     }
 
@@ -83,6 +86,8 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
 
 async def create_orders_in_db(payload: WebhookPayload, current_price: Decimal, session: AsyncSession):
     orders = calculate_orders(payload, current_price)
+
+    print(orders)
 
     # Создание ордеров и запись в базу данных
     for price, quantity in zip(orders["long_orders"], orders["martingale_orders"]):
@@ -93,10 +98,23 @@ async def create_orders_in_db(payload: WebhookPayload, current_price: Decimal, s
             side=payload.side,
             price=price,
             quantity=quantity,
-            leverage=payload.open.leverage
+            leverage=payload.open.leverage,
+            position_side=PositionSide.LONG
         )
         pprint(order.model_dump())
         session.add(order)
+
+    short_order = Order(
+        symbol=payload.symbol,
+        side="SELL",
+        price=orders["short_order_price"],
+        quantity=orders["short_order_amount"],
+        leverage=payload.open.leverage,
+        position_side=PositionSide.SHORT
+    )
+
+    pprint(short_order.model_dump())
+    session.add(short_order)
 
     await session.commit()
     return orders

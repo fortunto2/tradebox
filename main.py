@@ -6,8 +6,9 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
-from core.create_orders import calculate_prices, create_orders_in_db
+from core.create_orders import calculate_orders, create_orders_in_db
 from core.models.orders import Order
+from core.models.webhook import WebHook
 from core.schema import WebhookPayload
 from tg_client import TelegramClient
 from config import settings
@@ -75,6 +76,12 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     if open_orders:
         logging.info(f"Open orders found for symbol: {symbol}. Ignoring new webhook.")
         return {"status": "ignored", "reason": "open orders found"}
+
+    # save webhook to db
+    # async with async_session() as session:
+    #     webhook = WebHook(**body.dict())
+    #     session.add(webhook)
+    #     await session.commit()
 
     current_price = get_current_price(symbol)
     logging.info(f"Current price for {symbol}: {current_price}")
