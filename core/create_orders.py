@@ -34,6 +34,8 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
     grid_long_steps = payload.settings.grid_long
     initial_coins_quantity = payload.open.amount
     martingale_steps = payload.settings.mg_long
+    deposit = payload.settings.deposit
+    leverage = payload.open.leverage
 
     # Расчет цены Take Profit ордера от открытия позиции
     take_profit_order_price = Decimal(initial_price) * Decimal(1 + (take_profit_percentage + fee_percentage) / 100)
@@ -73,6 +75,16 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
     # Удаление начального количества монет, так как интересуют только результаты после первого шага
     martingale_orders = martingale_orders[1:]
 
+    # Функция для проверки достаточности средств
+    def is_sufficient_funds(initial_price, martingale_orders, max_deposit):
+        total_cost = sum([initial_price * coins for coins in martingale_orders])
+        return total_cost <= max_deposit
+
+    # Проверка
+    max_deposit = deposit * leverage
+    sufficient_funds = is_sufficient_funds(initial_price, martingale_orders, max_deposit)
+    total_cost = sum([initial_price * coins for coins in martingale_orders])
+
     # Формирование результата
     result = {
         "take_profit_order_price": take_profit_order_price,
@@ -81,13 +93,26 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
         "short_order_amount": short_order_amount,
         "stop_loss_short_order_price": stop_loss_short_order_price,
         # считаем каждый раз после SHORT, после подтерждения что позиция открылась
-        "martingale_orders": martingale_orders
+        "martingale_orders": martingale_orders,
+        "sufficient_funds": sufficient_funds,
+        "total_cost": total_cost
     }
 
     return result
 
 
 async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: AsyncSession):
+
+    position = await check_position(symbol=payload.symbol)
+    if position.get('markPrice'):
+        mark_price = Decimal(position.get('markPrice', 0))
+    else:
+        raise ValueError("mark_price not found in position.")
+
+    grid_orders = calculate_orders(payload, mark_price)
+
+    if grid_orders["sufficient_funds"] is False:
+        raise ValueError("Недостаточно средств для открытия позиции.")
 
     # first order by market
     first_quantity = payload.open.amount
@@ -116,8 +141,6 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
     session.add(first_order)
 
     index = 0
-
-    grid_orders = calculate_orders(payload, first_order.price)
 
     # Создание ордеров по мартигейлу и сетке
     for index, (price, quantity) in enumerate(zip(grid_orders["long_orders"], grid_orders["martingale_orders"])):

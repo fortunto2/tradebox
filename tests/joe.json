@@ -2,7 +2,7 @@
   "name": "APIKEY",
   "side": "buy",
   "positionSide": "long",
-  "symbol": "GLMUSDT",
+  "symbol": "JOEUSDT",
   "open": {
     "enabled": true,
     "amountType": "amount",

@@ -15,8 +15,7 @@ from tg_client import TelegramClient
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
-
-from core.db_async import  async_engine, get_async_session
+from core.db_async import async_engine, get_async_session
 
 
 @app.on_event("startup")
@@ -24,7 +23,7 @@ async def on_startup():
     async with async_engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
 
-#     check dual mode
+    #     check dual mode
     dual_mode = await check_position_side_dual()
     if not dual_mode:
         raise HTTPException(status_code=403, detail="Failed to set dual mode, check Binance settings!")
@@ -41,10 +40,10 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     #     return {"status": "ignored", "reason": "open orders found"}
 
     position = await check_position(symbol=body.symbol)
-    if position:
+    if float(position.get("entryPrice")) > 0:
         print(position)
         print(f"Position found for symbol: {body.symbol}. Ignoring new webhook.")
-        return {"status": "ignored", "reason": "position found"}
+        return {"status": "ignored", "reason": f"position found for {body.symbol}"}
 
     # save webhook to db
     webhook = WebHook(

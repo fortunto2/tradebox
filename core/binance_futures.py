@@ -166,9 +166,9 @@ async def check_position(symbol: str, side: str = 'LONG'):
     {
         "symbol": "BTCUSDT",
         "positionAmt": "0.001",
-        "entryPrice": "22185.2",
-        "breakEvenPrice": "0.0",  
-        "markPrice": "21123.05052574",
+        "entryPrice": "22185.2",  - цена входа
+        "breakEvenPrice": "0.0",  - цена без убытка
+        "markPrice": "21123.05052574", - цена по рынку, всегда есть даже без ордеров
         "unRealizedProfit": "-1.06214947",
         "liquidationPrice": "19731.45529116",
         "leverage": "4",
