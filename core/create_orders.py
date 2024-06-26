@@ -6,9 +6,11 @@ from pprint import pprint
 from sqlalchemy import create_engine
 from sqlmodel import SQLModel
 
+
 sys.path.append('..')
 sys.path.append('.')
 
+from core.binance_futures import create_order_binance
 from core.db_async import async_engine
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -85,27 +87,35 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
     return result
 
 
-async def create_orders_in_db(payload: WebhookPayload, current_price: Decimal, webhook_id, session: AsyncSession):
-    orders = calculate_orders(payload, current_price)
-
-    print(orders)
+async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: AsyncSession):
 
     # first order by market
     first_quantity = payload.open.amount
-    order = Order(
+    first_order = Order(
         symbol=payload.symbol,
         side=payload.side,
         quantity=first_quantity,
         leverage=payload.open.leverage,
         position_side=OrderPositionSide.LONG,
         type=OrderType.MARKET,
-        webhook_id=webhook_id
+        webhook_id=webhook_id,
+        order_number=0
     )
-    pprint(order.model_dump())
-    session.add(order)
+
+    # приходиться сразу создать ордер в бинанс, чтоб получить цену для расчета
+    order_binance_id, avg_price = await create_order_binance(first_order)
+    first_order.price = avg_price
+    first_order.binance_id = order_binance_id
+
+    pprint(first_order.model_dump())
+    session.add(first_order)
+
+    index = 0
+
+    grid_orders = calculate_orders(payload, avg_price)
 
     # Создание ордеров по мартигейлу и сетке
-    for price, quantity in zip(orders["long_orders"], orders["martingale_orders"]):
+    for index, price, quantity in enumerate(zip(grid_orders["long_orders"], grid_orders["martingale_orders"])):
         print("-----------------")
 
         order = Order(
@@ -116,7 +126,8 @@ async def create_orders_in_db(payload: WebhookPayload, current_price: Decimal, w
             leverage=payload.open.leverage,
             position_side=OrderPositionSide.LONG,
             type=OrderType.LIMIT,
-            webhook_id=webhook_id
+            webhook_id=webhook_id,
+            order_number=index
         )
         pprint(order.model_dump())
         session.add(order)
@@ -125,19 +136,20 @@ async def create_orders_in_db(payload: WebhookPayload, current_price: Decimal, w
     short_order = Order(
         symbol=payload.symbol,
         side=OrderSide.SELL,
-        price=orders["short_order_price"],
-        quantity=orders["short_order_amount"],
+        price=grid_orders["short_order_price"],
+        quantity=grid_orders["short_order_amount"],
         leverage=payload.open.leverage,
         position_side=OrderPositionSide.SHORT,
         type=OrderType.LIMIT,
-        webhook_id=webhook_id
+        webhook_id=webhook_id,
+        order_number=index + 1
     )
 
     pprint(short_order.model_dump())
     session.add(short_order)
 
     await session.commit()
-    return orders
+    return first_order, grid_orders, short_order
 
 
 async def main(payload: WebhookPayload, current_price: Decimal = Decimal(0.3634)):

@@ -7,6 +7,8 @@ import logging
 
 from fastapi import HTTPException
 
+from core.models.orders import Order
+
 sys.path.append('..')
 sys.path.append('.')
 
@@ -65,7 +67,7 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity):
     return quantity, price
 
 
-async def create_order(order):
+async def create_order_binance(order: Order):
     """
     https://binance-docs.github.io/apidocs/futures/en/#new-order-trade
 
@@ -74,19 +76,20 @@ async def create_order(order):
     """
 
     try:
-        quantity, price = get_symbol_price_and_quantity_by_precisions(order["symbol"], order["quantity"])
+        # todo: надо вынести в базу данные по точности числа quantity
+        quantity, price = get_symbol_price_and_quantity_by_precisions(order.symbol, order.quantity)
 
         response = client.new_order(
-            symbol=order["symbol"],
-            type='MARKET',
+            symbol=order.symbol,
+            type=order.type,
             quantity=quantity,
-            positionSide='LONG',
-            side=order["side"],
-            # price=price
+            positionSide=order.position_side,
+            side=order.side,
+            price=price
         )
 
         logging.info(f"Order created successfully: {response}")
-        return response['orderId']
+        return response['orderId'], response['avgPrice']
     except Exception as e:
         logging.error(f"Failed to create order: {e}")
         raise HTTPException(status_code=500, detail="Failed to create order")
@@ -179,7 +182,7 @@ def monitor_ws(symbol):
         listen_key=listen_key,
         symbol=symbol
     )
-    
+
     # данные по цене
     # ws_client.agg_trade(
     #     symbol=symbol,

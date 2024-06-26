@@ -6,20 +6,16 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
-from core.create_orders import calculate_orders, create_orders_in_db
+from core.create_orders import create_orders_in_db
 from core.models.webhook import WebHook
 from core.schema import WebhookPayload
+from tg_client import TelegramClient
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
-from core.binance_futures import get_current_price, \
-    create_order, check_open_orders, wait_order
 
-# Global state to keep track of open positions
-positions = {}
-
-from core.db_async import async_session, async_engine, get_async_session
+from core.db_async import  async_engine, get_async_session
 
 
 @app.on_event("startup")
@@ -28,22 +24,9 @@ async def on_startup():
         await conn.run_sync(SQLModel.metadata.create_all)
 
 
-async def create_orders(payload: WebhookPayload, current_price: Decimal, webhook_id, session):
-
-    orders = await create_orders_in_db(payload, current_price, webhook_id, session)
-
-    for order in orders:
-        print(order)
-        order_id = await create_order(order)
-        await wait_order(order["symbol"], order_id)
-        break
-
-
 @app.post("/webhook")
 async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(get_async_session)):
     logging.info(f"Received webhook JSON payload: {body.json()}")
-
-    symbol = body.symbol
 
     # firstly check existing orders
     # open_orders = await check_open_orders(symbol)
@@ -63,17 +46,16 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     session.add(webhook)
     await session.commit()
 
+    # Send the positions data as a string message to Telegram
+    tg = TelegramClient()
+    message = f"New webhook: {webhook.model_dump_json()}"
+    tg.send_message(message=message)
 
     # current_price = get_current_price(symbol)
-    current_price = Decimal(0.3634)
-    logging.info(f"Current price for {symbol}: {current_price}")
+    # logging.info(f"Current price for {symbol}: {current_price}")
 
-    await create_orders(body, current_price, webhook.id, session)
-
-    # Send the positions data as a string message to Telegram
-    # tg = TelegramClient()
-    # message = f"New position opened: {positions}"
-    # tg.send_message(message=message)
+    first_order, grid_orders, short_order = await create_orders_in_db(body, webhook.id, session)
+    tg.send_message(message=first_order.model_dump_json())
 
     return {"status": "success"}
 
