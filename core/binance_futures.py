@@ -205,7 +205,7 @@ async def check_position(symbol: str, side: str = 'LONG'):
     try:
         positions = client.get_position_risk(symbol=symbol)
         if positions:
-            logging.info(f"Position: {positions}")
+            print(f"Position: {positions}")
 
             # if LONG return entryPrice, with next
             position = next((p for p in positions if p['positionSide'] == side), None)
