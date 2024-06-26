@@ -36,7 +36,7 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
     martingale_steps = payload.settings.mg_long
 
     # Расчет цены Take Profit ордера от открытия позиции
-    take_profit_order_price = initial_price * Decimal(1 + (take_profit_percentage + fee_percentage) / 100)
+    take_profit_order_price = Decimal(initial_price) * Decimal(1 + (take_profit_percentage + fee_percentage) / 100)
 
     # Проверка корректности данных для количества шагов в сетке и количества ордеров
     if len(grid_long_steps) != order_quantity:
