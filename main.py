@@ -6,7 +6,7 @@ from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
-from core.binance_futures import check_position_side_dual
+from core.binance_futures import check_position_side_dual, check_position
 from core.create_orders import create_orders_in_db
 from core.models.webhook import WebHook
 from core.schema import WebhookPayload
@@ -39,6 +39,12 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     # if open_orders:
     #     logging.info(f"Open orders found for symbol: {symbol}. Ignoring new webhook.")
     #     return {"status": "ignored", "reason": "open orders found"}
+
+    position = await check_position(symbol=body.symbol)
+    if position:
+        print(position)
+        print(f"Position found for symbol: {body.symbol}. Ignoring new webhook.")
+        return {"status": "ignored", "reason": "position found"}
 
     # save webhook to db
     webhook = WebHook(
