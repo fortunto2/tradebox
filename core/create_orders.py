@@ -14,7 +14,7 @@ from core.binance_futures import create_order_binance, wait_order, wait_order_id
 from core.db_async import async_engine
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide
+from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide, OrderStatus, OrderBinanceStatus
 from core.schema import WebhookPayload
 
 
@@ -109,6 +109,8 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
     position = await check_position(symbol=payload.symbol)
     if position:
         first_order.price = position['entryPrice']
+        first_order.status = OrderStatus.FILLED
+        first_order.binance_status = OrderBinanceStatus.FILLED
 
     pprint(first_order.model_dump())
     session.add(first_order)
@@ -130,7 +132,7 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
             position_side=OrderPositionSide.LONG,
             type=OrderType.LIMIT,
             webhook_id=webhook_id,
-            order_number=index
+            order_number=index +1
         )
         pprint(order.model_dump())
         session.add(order)
