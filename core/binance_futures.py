@@ -80,10 +80,10 @@ async def create_order_binance(order: Order):
 
         response = client.new_order(
             symbol=order.symbol,
-            type=order.type,
+            type=order.type.value,
             quantity=quantity,
-            positionSide=order.position_side,
-            side=order.side,
+            positionSide=order.position_side.value,
+            side=order.side.value,
             price=price
         )
 
