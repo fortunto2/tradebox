@@ -9,7 +9,7 @@ from fastapi import HTTPException
 
 sys.path.append('..')
 sys.path.append('.')
-from core.models.orders import Order
+from core.models.orders import Order, OrderType
 
 from config import settings
 
@@ -78,17 +78,18 @@ async def create_order_binance(order: Order):
         # todo: надо вынести в базу данные по точности числа quantity
         quantity, price = get_symbol_price_and_quantity_by_precisions(order.symbol, order.quantity)
 
-        if order.type == 'MARKET':
-            price = None
+        order_params = {
+            "symbol": order.symbol,
+            "type": order.type.value,
+            "quantity": quantity,
+            "positionSide": order.position_side.value,
+            "side": order.side.value
+        }
 
-        response = client.new_order(
-            symbol=order.symbol,
-            type=order.type.value,
-            quantity=quantity,
-            positionSide=order.position_side.value,
-            side=order.side.value,
-            price=price
-        )
+        if order.type != OrderType.MARKET:
+            order_params["price"] = price
+
+        response = client.new_order(**order_params)
 
         logging.info(f"Order created successfully: {response}")
         return response['orderId'], response['avgPrice']
