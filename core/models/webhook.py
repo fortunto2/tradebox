@@ -1,9 +1,8 @@
 import enum
 from decimal import Decimal
-from typing import Optional, Literal
+from typing import Optional, Literal, Dict, List
 
-from sqlalchemy.dialects.sqlite import JSON
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, JSON, Relationship
 
 
 class WebHook(SQLModel, table=True):
@@ -13,7 +12,8 @@ class WebHook(SQLModel, table=True):
     side: str
     positionSide: str
     symbol: str
-    open: JSON
-    settings: JSON
+    open: Optional[dict] = Field(nullable=True, sa_type=JSON)
+    settings: Optional[dict] = Field(nullable=True, sa_type=JSON)
     status: str = 'new'
 
+    orders: List["Order"] = Relationship(back_populates="webhook")

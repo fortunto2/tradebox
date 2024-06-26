@@ -7,11 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
 from core.create_orders import calculate_orders, create_orders_in_db
-from core.models.orders import Order
 from core.models.webhook import WebHook
 from core.schema import WebhookPayload
-from tg_client import TelegramClient
-from config import settings
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -31,32 +28,9 @@ async def on_startup():
         await conn.run_sync(SQLModel.metadata.create_all)
 
 
-async def create_orders(payload: WebhookPayload, current_price: Decimal):
-    orders = []
-    settings = payload.settings
-    mg_long = settings.mg_long
-    grid_long = settings.grid_long
+async def create_orders(payload: WebhookPayload, current_price: Decimal, webhook_id, session):
 
-    initial_quantity = payload.open.amount
-    total_spent = 0
-
-    for i in range(settings.order_quan):
-        if i < len(mg_long) and i < len(grid_long):
-            price = current_price * Decimal(1 + grid_long[i] / 100)
-            quantity = initial_quantity * Decimal(mg_long[i] / 100)
-            cost = price * quantity
-
-            if total_spent + cost > settings.deposit:
-                break
-
-            total_spent += cost
-            orders.append({
-                "symbol": payload.symbol,
-                "side": payload.side,
-                "price": str(price),
-                "quantity": str(quantity),
-                "leverage": payload.open.leverage
-            })
+    orders = await create_orders_in_db(payload, current_price, webhook_id, session)
 
     for order in orders:
         print(order)
@@ -72,21 +46,29 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     symbol = body.symbol
 
     # firstly check existing orders
-    open_orders = await check_open_orders(symbol)
-    if open_orders:
-        logging.info(f"Open orders found for symbol: {symbol}. Ignoring new webhook.")
-        return {"status": "ignored", "reason": "open orders found"}
+    # open_orders = await check_open_orders(symbol)
+    # if open_orders:
+    #     logging.info(f"Open orders found for symbol: {symbol}. Ignoring new webhook.")
+    #     return {"status": "ignored", "reason": "open orders found"}
 
     # save webhook to db
-    # async with async_session() as session:
-    #     webhook = WebHook(**body.dict())
-    #     session.add(webhook)
-    #     await session.commit()
+    webhook = WebHook(
+        name=body.name,
+        side=body.side.value,
+        positionSide=body.positionSide.value,
+        symbol=body.symbol,
+        open=body.open.model_dump_json(),
+        settings=body.settings.model_dump_json()
+    )
+    session.add(webhook)
+    await session.commit()
 
-    current_price = get_current_price(symbol)
+
+    # current_price = get_current_price(symbol)
+    current_price = Decimal(0.3634)
     logging.info(f"Current price for {symbol}: {current_price}")
 
-    await create_orders_in_db(body, current_price, session)
+    await create_orders(body, current_price, webhook.id, session)
 
     # Send the positions data as a string message to Telegram
     # tg = TelegramClient()

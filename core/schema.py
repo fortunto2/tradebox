@@ -4,6 +4,8 @@ from typing import List, Union, Literal, Optional
 
 from pydantic import BaseModel, validator, field_validator
 
+from core.models.orders import OrderSide, OrderPositionSide
+
 
 # Define Pydantic models for webhook validation
 class OpenOrder(BaseModel):
@@ -38,17 +40,24 @@ class Settings(BaseModel):
 
 class WebhookPayload(BaseModel):
     name: str
-    side: Literal['BUY', 'SELL']
-    positionSide: str
+    side: OrderSide
+    positionSide: OrderPositionSide
     symbol: str
     open: OpenOrder
     settings: Settings
 
     @field_validator('side', mode='before')
-    def select_side(cls, v):
-        if v.lower() == 'buy':
-            return 'BUY'
-        elif v.lower() == 'sell':
-            return 'SELL'
-        else:
-            return v.upper()
+    def validate_side(cls, v):
+        if isinstance(v, str):
+            v = v.upper()
+        if v in OrderSide.__members__:
+            return OrderSide[v]
+        raise ValueError('Invalid value for side')
+
+    @field_validator('positionSide', mode='before')
+    def validate_position_side(cls, v):
+        if isinstance(v, str):
+            v = v.upper()
+        if v in OrderPositionSide.__members__:
+            return OrderPositionSide[v]
+        raise ValueError('Invalid value for positionSide')

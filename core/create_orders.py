@@ -12,7 +12,7 @@ sys.path.append('.')
 from core.db_async import async_engine
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.models.orders import Order, PositionSide
+from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide
 from core.schema import WebhookPayload
 
 
@@ -77,19 +77,34 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
         "long_orders": long_orders,
         "short_order_price": short_order_price,
         "short_order_amount": short_order_amount,
-        "stop_loss_short_order_price": stop_loss_short_order_price, #считаем каждый раз после SHORT, после подтерждения что позиция открылась
+        "stop_loss_short_order_price": stop_loss_short_order_price,
+        # считаем каждый раз после SHORT, после подтерждения что позиция открылась
         "martingale_orders": martingale_orders
     }
 
     return result
 
 
-async def create_orders_in_db(payload: WebhookPayload, current_price: Decimal, session: AsyncSession):
+async def create_orders_in_db(payload: WebhookPayload, current_price: Decimal, webhook_id, session: AsyncSession):
     orders = calculate_orders(payload, current_price)
 
     print(orders)
 
-    # Создание ордеров и запись в базу данных
+    # first order by market
+    first_quantity = payload.open.amount
+    order = Order(
+        symbol=payload.symbol,
+        side=payload.side,
+        quantity=first_quantity,
+        leverage=payload.open.leverage,
+        position_side=OrderPositionSide.LONG,
+        type=OrderType.MARKET,
+        webhook_id=webhook_id
+    )
+    pprint(order.model_dump())
+    session.add(order)
+
+    # Создание ордеров по мартигейлу и сетке
     for price, quantity in zip(orders["long_orders"], orders["martingale_orders"]):
         print("-----------------")
 
@@ -99,18 +114,23 @@ async def create_orders_in_db(payload: WebhookPayload, current_price: Decimal, s
             price=price,
             quantity=quantity,
             leverage=payload.open.leverage,
-            position_side=PositionSide.LONG
+            position_side=OrderPositionSide.LONG,
+            type=OrderType.LIMIT,
+            webhook_id=webhook_id
         )
         pprint(order.model_dump())
         session.add(order)
 
+    # финальный ордер на шорт
     short_order = Order(
         symbol=payload.symbol,
-        side="SELL",
+        side=OrderSide.SELL,
         price=orders["short_order_price"],
         quantity=orders["short_order_amount"],
         leverage=payload.open.leverage,
-        position_side=PositionSide.SHORT
+        position_side=OrderPositionSide.SHORT,
+        type=OrderType.LIMIT,
+        webhook_id=webhook_id
     )
 
     pprint(short_order.model_dump())
