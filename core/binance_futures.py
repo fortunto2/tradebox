@@ -92,7 +92,7 @@ async def create_order_binance(order: Order):
         response = client.new_order(**order_params)
 
         logging.info(f"Order created successfully: {response}")
-        return response['orderId'], response['avgPrice']
+        return response['orderId']
     except Exception as e:
         logging.error(f"Failed to create order: {e}")
         raise HTTPException(status_code=500, detail="Failed to create order")

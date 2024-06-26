@@ -10,7 +10,7 @@ from sqlmodel import SQLModel
 sys.path.append('..')
 sys.path.append('.')
 
-from core.binance_futures import create_order_binance
+from core.binance_futures import create_order_binance, wait_order
 from core.db_async import async_engine
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -103,9 +103,13 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
     )
 
     # приходиться сразу создать ордер в бинанс, чтоб получить цену для расчета
-    order_binance_id, avg_price = await create_order_binance(first_order)
-    first_order.price = Decimal(avg_price)
+    order_binance_id = await create_order_binance(first_order)
     first_order.binance_id = order_binance_id
+
+    first_order_binance = await wait_order(payload.symbol, order_binance_id)
+    if first_order_binance['status'] != 'FILLED':
+        avg_price = Decimal(first_order_binance['avgPrice'])
+        first_order.price = avg_price
 
     pprint(first_order.model_dump())
     session.add(first_order)
