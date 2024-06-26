@@ -45,7 +45,7 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
     # Расчет цен лимитных ордеров для усреднения на лонг
     long_orders = [initial_price]
     for step in grid_long_steps:
-        next_price = long_orders[-1] * Decimal(1 - step / 100)
+        next_price = Decimal(long_orders[-1]) * Decimal(1 - step / 100)
         long_orders.append(next_price)
 
     # Удаление начальной цены, так как рассматриваются только усредняющие ордера
@@ -53,10 +53,10 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
 
     # Расчет цены лимитного ордера на шорт
     last_averaging_long_order_price = long_orders[-1]
-    short_order_price = last_averaging_long_order_price * Decimal(1 - offset_short_percentage / 100)
+    short_order_price = Decimal(last_averaging_long_order_price) * Decimal(1 - offset_short_percentage / 100)
 
     # Расчет стоп-лосса для короткой позиции
-    stop_loss_short_order_price = short_order_price * Decimal(1 + stop_loss_short_percentage / 100)
+    stop_loss_short_order_price = Decimal(short_order_price) * Decimal(1 + stop_loss_short_percentage / 100)
 
     short_order_amount = Decimal(payload.settings.extramarg * payload.open.leverage) / short_order_price
 
@@ -104,7 +104,7 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
 
     # приходиться сразу создать ордер в бинанс, чтоб получить цену для расчета
     order_binance_id, avg_price = await create_order_binance(first_order)
-    first_order.price = avg_price
+    first_order.price = Decimal(avg_price)
     first_order.binance_id = order_binance_id
 
     pprint(first_order.model_dump())
@@ -112,7 +112,7 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
 
     index = 0
 
-    grid_orders = calculate_orders(payload, avg_price)
+    grid_orders = calculate_orders(payload, first_order.price)
 
     # Создание ордеров по мартигейлу и сетке
     for index, price, quantity in enumerate(zip(grid_orders["long_orders"], grid_orders["martingale_orders"])):
