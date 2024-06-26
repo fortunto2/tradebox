@@ -78,6 +78,9 @@ async def create_order_binance(order: Order):
         # todo: надо вынести в базу данные по точности числа quantity
         quantity, price = get_symbol_price_and_quantity_by_precisions(order.symbol, order.quantity)
 
+        if order.type == 'MARKET':
+            price = None
+
         response = client.new_order(
             symbol=order.symbol,
             type=order.type.value,
