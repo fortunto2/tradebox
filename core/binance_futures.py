@@ -6,6 +6,7 @@ import sys
 import logging
 
 from fastapi import HTTPException
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 sys.path.append('..')
 sys.path.append('.')
@@ -17,6 +18,8 @@ client = UMFutures()
 # get server time
 print(client.time())
 client = UMFutures(key=settings.BINANCE_API_KEY, secret=settings.BINANCE_API_SECRET)
+
+
 # Get account information
 # print(client.account())
 
@@ -39,7 +42,7 @@ def adjust_precision(value, precision):
 
 
 @lru_cache()
-def get_symbol_price_and_quantity_by_precisions(symbol, quantity):
+def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
     symbol_info = get_symbol_info(symbol)
     if not symbol_info:
         raise ValueError(f"Symbol {symbol} not found in exchange info")
@@ -56,7 +59,8 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity):
     print("quantity_precision: ", quantity_precision)
     print("price_precision : ", price_precision)
 
-    price = client.ticker_price(symbol).get('price')
+    if price is None:
+        price = client.ticker_price(symbol).get('price')
     print(price)
 
     # Приведение quantity и price к Decimal и корректировка точности
@@ -76,7 +80,7 @@ async def create_order_binance(order: Order):
 
     try:
         # todo: надо вынести в базу данные по точности числа quantity
-        quantity, price = get_symbol_price_and_quantity_by_precisions(order.symbol, order.quantity)
+        quantity, price = get_symbol_price_and_quantity_by_precisions(order.symbol, order.quantity, order.price)
 
         order_params = {
             "symbol": order.symbol,
@@ -84,11 +88,11 @@ async def create_order_binance(order: Order):
             "quantity": quantity,
             "positionSide": order.position_side.value,
             "side": order.side.value,
-            "timeInForce": 'GTC'
         }
 
         if order.type != OrderType.MARKET:
             order_params["price"] = price
+            order_params["timeInForce"] = "GTC"
 
         response = client.new_order(**order_params)
 
@@ -297,7 +301,6 @@ def monitor_ws(symbol):
     #     action=UMFuturesWebsocketClient.ACTION_SUBSCRIBE
     #
     # )
-
 
 
 if __name__ == "__main__":

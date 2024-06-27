@@ -16,6 +16,7 @@ binance-futures-connector = "^4.0.0"
 sqlmodel = "^0.0.19"
 aiosqlite = "^0.20.0"
 greenlet = "^3.0.3"
+asyncio = "^3.4.3"
 
 
 [tool.poetry.group.dev.dependencies]
