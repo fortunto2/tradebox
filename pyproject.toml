@@ -17,6 +17,7 @@ sqlmodel = "^0.0.19"
 aiosqlite = "^0.20.0"
 greenlet = "^3.0.3"
 asyncio = "^3.4.3"
+prefect = "^2.19.6"
 
 
 [tool.poetry.group.dev.dependencies]
