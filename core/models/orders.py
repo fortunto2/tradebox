@@ -72,6 +72,6 @@ class Order(BaseTable, table=True):
     status: Optional[OrderStatus] = OrderStatus.NEW
     binance_status: Optional[OrderBinanceStatus] = None
 
-    __table_args__ = (
-        Index("idx_webhook_symbol", "webhook_id", "symbol", "status", unique=True),
-    )
+    # __table_args__ = (
+    #     Index("idx_webhook_symbol", "webhook_id", "symbol", "status", unique=True),
+    # )

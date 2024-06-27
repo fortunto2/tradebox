@@ -83,7 +83,8 @@ async def create_order_binance(order: Order):
             "type": order.type.value,
             "quantity": quantity,
             "positionSide": order.position_side.value,
-            "side": order.side.value
+            "side": order.side.value,
+            "timeInForce": 'GTC'
         }
 
         if order.type != OrderType.MARKET:
@@ -276,7 +277,6 @@ def on_message(ws, msg):
         logging.info(f"Order status: {order_status}")
         if order_status in ['FILLED', 'CANCELED', 'REJECTED']:
             logging.info(f"Order completed with status: {order_status}")
-
 
 
 def monitor_ws(symbol):
