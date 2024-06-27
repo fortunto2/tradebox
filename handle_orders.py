@@ -70,6 +70,7 @@ async def create_new_orders():
             if orders:
                 # todo: перероверять статусы на бинанс
                 order = orders[0]
+                print(f'Create new orders for {order.symbol}')
                 order_id_binance = await create_order_binance(order)
                 # Add the websocket monitoring code here if necessary
 
@@ -183,6 +184,6 @@ if __name__ == '__main__':
 
     loop = asyncio.get_event_loop()
     if loop.is_running():
-        asyncio.run(monitor_orders())
+        asyncio.run(create_new_orders())
     else:
-        loop.run_until_complete(monitor_orders())
+        loop.run_until_complete(create_new_orders())
