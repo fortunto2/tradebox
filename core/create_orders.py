@@ -6,7 +6,6 @@ from pprint import pprint
 from sqlalchemy import create_engine
 from sqlmodel import SQLModel
 
-
 sys.path.append('..')
 sys.path.append('.')
 
@@ -102,7 +101,6 @@ def calculate_orders(payload: WebhookPayload, initial_price: Decimal, fee_percen
 
 
 async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: AsyncSession):
-
     position = await check_position(symbol=payload.symbol)
     if position.get('markPrice'):
         mark_price = Decimal(position.get('markPrice', 0))
@@ -142,23 +140,48 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
 
     index = 0
 
+    tp_price = Decimal(position['breakEvenPrice']) * (1 + Decimal(payload.settings.tp) / 100)
+
+    # любое измение позиции, если поменялась что нибудь, берем из позиции новый обьем и цену.
+    take_proffit_order = Order(
+        symbol=payload.symbol,
+        side=OrderSide.SELL,
+        quantity=position['positionAmt'],
+        leverage=payload.open.leverage,
+        position_side=OrderPositionSide.LONG,
+        type=OrderType.LIMIT,
+        webhook_id=webhook_id,
+        order_number=0,
+        price=tp_price
+    )
+    # старый надо отменить, запоминать старый.
+
+    pprint(take_proffit_order.model_dump())
+    order_binance_id = await create_order_binance(take_proffit_order)
+
+    long_buy_orders = []
+
     # Создание ордеров по мартигейлу и сетке
     for index, (price, quantity) in enumerate(zip(grid_orders["long_orders"], grid_orders["martingale_orders"])):
         print("-----------------")
 
         order = Order(
             symbol=payload.symbol,
-            side=payload.side,
+            side=OrderSide.BUY,
             price=price,
             quantity=quantity,
             leverage=payload.open.leverage,
             position_side=OrderPositionSide.LONG,
             type=OrderType.LIMIT,
             webhook_id=webhook_id,
-            order_number=index +1
+            order_number=index + 1
         )
         pprint(order.model_dump())
         session.add(order)
+
+        long_buy_orders.append(order)
+
+    order_binance_id = await create_order_binance(long_buy_orders[0])
 
     # финальный ордер на шорт
     short_order = Order(

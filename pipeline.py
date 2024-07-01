@@ -25,6 +25,7 @@ message_queue = asyncio.Queue()
 async def load_new_orders_task(session: AsyncSession, symbol: str = None):
     return await load_new_orders(session, symbol)
 
+
 @task
 async def create_and_monitor_new_orders():
     async with AsyncSession(async_engine) as session:
@@ -42,6 +43,7 @@ async def create_and_monitor_new_orders():
         # After the session is committed and closed, start monitoring
         for order in orders:
             await monitor_symbol.submit(order.symbol)  # This should be outside the session scope if it does not need database access
+
 
 @task(retries=3, retry_delay_seconds=10)
 async def load_in_progress_orders():
