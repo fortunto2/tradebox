@@ -7,7 +7,7 @@ https://docs.google.com/spreadsheets/d/1g1U8zsxZvC6TDC3TF3Krb2pm9n2MaENUmvOtpRWR
 prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
 
 
-1. Приходи вебхук
+1. Приходит вебхук
 2. Проверка позиции
 3. Создание ордера по маркету
 4. Создание сетки ордеров

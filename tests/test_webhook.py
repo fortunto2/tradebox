@@ -4,11 +4,10 @@ import sys
 sys.path.append('..')
 sys.path.append('.')
 
-import pytest
 import requests
 import json
 
-from core.schema import WebhookPayload
+from core.schemas.webhook import WebhookPayload
 
 
 def test_webhook():

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from functools import partial
 
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
 from sqlmodel import select
@@ -8,9 +7,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from core.models.orders import Order, OrderStatus
 from core.db_async import async_engine
 from core.binance_futures import create_order_binance, client
-from prefect import flow, task, get_run_logger
+from prefect import flow, task
 
-from handle_orders import load_new_orders
+from trade.handle_orders import load_new_orders
 
 # Configuring the logging level and logger.
 logging.basicConfig(level=logging.INFO)

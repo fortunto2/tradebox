@@ -56,7 +56,6 @@ class OrderType(enum.Enum):
 
 class Order(BaseTable, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    order_number: Optional[int] = Field(nullable=True) #номер в сетке
     webhook_id: Optional[int] = Field(default=None, foreign_key="webhook.id")
     webhook: "WebHook" = Relationship(back_populates="orders")
     binance_id: Optional[str]

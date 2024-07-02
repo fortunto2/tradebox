@@ -1,16 +1,14 @@
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends
 import logging
-from decimal import Decimal, ROUND_DOWN
-from typing import List
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
 from core.binance_futures import check_position_side_dual, check_position
-from core.create_orders import create_orders_in_db
+from trade.create_orders import create_orders_in_db
 from core.models.webhook import WebHook
-from core.schema import WebhookPayload
-from tg_client import TelegramClient
+from core.schemas.webhook import WebhookPayload
+from core.tg_client import TelegramClient
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +30,7 @@ async def on_startup():
 @app.post("/webhook")
 async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(get_async_session)):
     logging.info(f"Received webhook JSON payload: {body.json()}")
+
 
     # firstly check existing orders
     # open_orders = await check_open_orders(symbol)

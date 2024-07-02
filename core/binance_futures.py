@@ -8,6 +8,8 @@ import logging
 from fastapi import HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from core.schemas.position import LongPosition, ShortPosition
+
 sys.path.append('..')
 sys.path.append('.')
 from core.models.orders import Order, OrderType
@@ -88,6 +90,7 @@ async def create_order_binance(order: Order):
             "quantity": quantity,
             "positionSide": order.position_side.value,
             "side": order.side.value,
+            'newClientOrderId': order.id,
         }
 
         if order.type != OrderType.MARKET:
@@ -160,52 +163,11 @@ async def check_position_side_dual() -> bool:
         raise HTTPException(status_code=500, detail="Failed to get position side dual")
 
 
-async def check_position(symbol: str, side: str = 'LONG'):
+async def check_position(symbol: str) -> (LongPosition, ShortPosition):
     "GET /fapi/v2/positionRisk"
     """
     https://binance-docs.github.io/apidocs/futures/en/#position-information-v2-user_data
-    
-    Result For Hedge position mode:
-
-[
-    {
-        "symbol": "BTCUSDT",
-        "positionAmt": "0.001",
-        "entryPrice": "22185.2",  - цена входа
-        "breakEvenPrice": "0.0",  - цена без убытка
-        "markPrice": "21123.05052574", - цена по рынку, всегда есть даже без ордеров
-        "unRealizedProfit": "-1.06214947",
-        "liquidationPrice": "19731.45529116",
-        "leverage": "4",
-        "maxNotionalValue": "100000000",
-        "marginType": "cross",
-        "isolatedMargin": "0.00000000",
-        "isAutoAddMargin": "false",
-        "positionSide": "LONG",
-        "notional": "21.12305052",
-        "isolatedWallet": "0",
-        "updateTime": 1655217461579
-    },
-    {
-        "symbol": "BTCUSDT",
-        "positionAmt": "0.000",
-        "entryPrice": "0.0",
-        "breakEvenPrice": "0.0",  
-        "markPrice": "21123.05052574",
-        "unRealizedProfit": "0.00000000",
-        "liquidationPrice": "0",
-        "leverage": "4",
-        "maxNotionalValue": "100000000",
-        "marginType": "cross",
-        "isolatedMargin": "0.00000000",
-        "isAutoAddMargin": "false",
-        "positionSide": "SHORT",
-        "notional": "0",
-        "isolatedWallet": "0",
-        "updateTime": 0
-    }
-]
-"""
+    """
 
     try:
         positions = client.get_position_risk(symbol=symbol)
@@ -213,15 +175,16 @@ async def check_position(symbol: str, side: str = 'LONG'):
             print(f"Position: {positions}")
 
             # if LONG return entryPrice, with next
-            position = next((p for p in positions if p['positionSide'] == side), None)
+            position_long = next((LongPosition(**p) for p in positions if p['positionSide'] == 'LONG'), None)
+            position_short = next((ShortPosition(**p) for p in positions if p['positionSide'] == 'SHORT'), None)
 
-            return position
+            return position_long, position_short
 
     except Exception as e:
         logging.error(f"Failed to get position: {e}")
         raise HTTPException(status_code=500, detail="Failed to get position")
 
-    return None
+    return None, None
 
 
 async def wait_order_id(symbol, order_id):
