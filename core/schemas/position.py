@@ -69,8 +69,8 @@ class BasePosition(BaseModel):
 
 
 class LongPosition(BasePosition):
-    positionSide: Literal[OrderPositionSide.LONG]
+    positionSide: Literal['LONG']
 
 
 class ShortPosition(BasePosition):
-    positionSide: Literal[OrderPositionSide.SHORT]
+    positionSide: Literal['SHORT']

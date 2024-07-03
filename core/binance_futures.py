@@ -12,7 +12,7 @@ from core.schemas.position import LongPosition, ShortPosition
 
 sys.path.append('..')
 sys.path.append('.')
-from core.models.orders import Order, OrderType
+from core.models.orders import Order, OrderType, OrderPositionSide
 
 from config import settings
 
@@ -80,30 +80,29 @@ async def create_order_binance(order: Order):
     :return:
     """
 
-    try:
-        # todo: надо вынести в базу данные по точности числа quantity
-        quantity, price = get_symbol_price_and_quantity_by_precisions(order.symbol, order.quantity, order.price)
+    # todo: надо вынести в базу данные по точности числа quantity
+    quantity, price = get_symbol_price_and_quantity_by_precisions(order.symbol, order.quantity, order.price)
 
-        order_params = {
-            "symbol": order.symbol,
-            "type": order.type.value,
-            "quantity": quantity,
-            "positionSide": order.position_side.value,
-            "side": order.side.value,
-            'newClientOrderId': order.id,
-        }
+    order_params = {
+        "symbol": order.symbol,
+        "type": order.type.value,
+        "quantity": quantity,
+        "positionSide": order.position_side.value,
+        "side": order.side.value,
+        'newClientOrderId': order.id,
+    }
 
-        if order.type != OrderType.MARKET:
-            order_params["price"] = price
-            order_params["timeInForce"] = "GTC"
+    if order.type != OrderType.MARKET:
+        order_params["price"] = price
+        order_params["timeInForce"] = "GTC"
 
-        response = client.new_order(**order_params)
+    response = client.new_order(**order_params)
 
-        logging.info(f"Order created successfully: {response}")
-        return response['orderId']
-    except Exception as e:
-        logging.error(f"Failed to create order: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create order")
+    logging.info(f"Order created successfully: {response}")
+    return response['orderId']
+    # except Exception as e:
+    #     logging.error(f"Failed to create order: {e}")
+    #     raise HTTPException(status_code=500, detail="Failed to create order")
 
 
 async def wait_order(symbol):
@@ -169,20 +168,15 @@ async def check_position(symbol: str) -> (LongPosition, ShortPosition):
     https://binance-docs.github.io/apidocs/futures/en/#position-information-v2-user_data
     """
 
-    try:
-        positions = client.get_position_risk(symbol=symbol)
-        if positions:
-            print(f"Position: {positions}")
+    positions = client.get_position_risk(symbol=symbol)
+    if positions:
+        print(f"Position: {positions}")
 
-            # if LONG return entryPrice, with next
-            position_long = next((LongPosition(**p) for p in positions if p['positionSide'] == 'LONG'), None)
-            position_short = next((ShortPosition(**p) for p in positions if p['positionSide'] == 'SHORT'), None)
+        # if LONG return entryPrice, with next
+        position_long = next((LongPosition(**p) for p in positions if p['positionSide'] == 'LONG'), None)
+        position_short = next((ShortPosition(**p) for p in positions if p['positionSide'] == 'SHORT'), None)
 
-            return position_long, position_short
-
-    except Exception as e:
-        logging.error(f"Failed to get position: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get position")
+        return position_long, position_short
 
     return None, None
 

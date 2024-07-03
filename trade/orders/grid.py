@@ -31,7 +31,7 @@ def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal, fee_p
     leverage = payload.open.leverage
 
     # Расчет цены Take Profit ордера от открытия позиции
-    take_profit_order_price = Decimal(initial_price) * Decimal(1 + (take_profit_percentage + fee_percentage) / 100)
+    take_profit_order_price = Decimal(initial_price) * Decimal(1 + (take_profit_percentage + Decimal(fee_percentage)) / 100)
 
     # Проверка корректности данных для количества шагов в сетке и количества ордеров
     if len(grid_long_steps) != order_quantity:
@@ -99,35 +99,36 @@ async def update_grid(
         webhook_id,
         session: AsyncSession
 ):
-    position_long, position_short = await check_position(symbol=payload.symbol)
+    position_long, _ = await check_position(symbol=payload.symbol)
     position_long: LongPosition
-    position_short: ShortPosition
 
     grid_orders = calculate_grid_orders(payload, position_long.markPrice)
 
     if grid_orders["sufficient_funds"] is False:
         raise ValueError("Недостаточно средств для открытия позиции.")
 
-    long_buy_orders = []
+    return grid_orders
 
-    # Создание ордеров по мартигейлу и сетке
-    for index, (price, quantity) in enumerate(zip(grid_orders["long_orders"], grid_orders["martingale_orders"])):
-        print("-----------------")
-
-        order = Order(
-            symbol=payload.symbol,
-            side=OrderSide.BUY,
-            price=price,
-            quantity=quantity,
-            leverage=payload.open.leverage,
-            position_side=OrderPositionSide.LONG,
-            type=OrderType.LIMIT,
-            webhook_id=webhook_id,
-            order_number=index + 1
-        )
-        pprint(order.model_dump())
-        session.add(order)
-
-        long_buy_orders.append(order)
-
-    order_binance_id = await create_order_binance(long_buy_orders[0])
+    # long_buy_orders = []
+    #
+    # # Создание ордеров по мартигейлу и сетке
+    # for index, (price, quantity) in enumerate(zip(grid_orders["long_orders"], grid_orders["martingale_orders"])):
+    #     print("-----------------")
+    #
+    #     order = Order(
+    #         symbol=payload.symbol,
+    #         side=OrderSide.BUY,
+    #         price=price,
+    #         quantity=quantity,
+    #         leverage=payload.open.leverage,
+    #         position_side=OrderPositionSide.LONG,
+    #         type=OrderType.LIMIT,
+    #         webhook_id=webhook_id,
+    #         order_number=index + 1
+    #     )
+    #     pprint(order.model_dump())
+    #     session.add(order)
+    #
+    #     long_buy_orders.append(order)
+    #
+    # order_binance_id = await create_order_binance(long_buy_orders[0])

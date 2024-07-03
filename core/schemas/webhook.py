@@ -19,7 +19,7 @@ class Settings(BaseModel):
     deposit: float
     time_allert: datetime
     extramarg: float
-    tp: float
+    tp: Decimal
     trail_1: float
     trail_2: float
     offset_short: float

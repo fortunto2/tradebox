@@ -7,7 +7,7 @@ from sqlmodel import Index
 from sqlmodel import SQLModel, Field, Relationship
 
 from core.models.base import BaseTable
-from core.models.webhook import WebHook
+# from core.models.webhook import WebHook
 
 
 class OrderBinanceStatus(enum.Enum):
