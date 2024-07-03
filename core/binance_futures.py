@@ -7,6 +7,7 @@ import logging
 
 from fastapi import HTTPException
 from sqlmodel.ext.asyncio.session import AsyncSession
+from tqdm import tqdm
 
 from core.schemas.position import LongPosition, ShortPosition
 
@@ -182,22 +183,20 @@ async def check_position(symbol: str) -> (LongPosition, ShortPosition):
 
 
 async def wait_order_id(symbol, order_id):
-    try:
-        print(f"Monitoring order {symbol}: {order_id}")
+    print(f"Monitoring order {symbol}: {order_id}")
+    with tqdm(desc="Checking order status", unit="check", position=0, leave=True) as pbar:
+
         while True:
-            orders = client.get_open_orders(symbol=symbol, order_id=order_id)
+            order = client.get_open_orders(symbol=symbol, orderId=order_id)
+            # Update the description with the current status
+            pbar.set_description(f"Order {order_id} current status: {order['status']}")
+            pbar.update(1)
 
-            for order in orders:
-                print(order)
-
-                if order['status'] in ['FILLED', 'CANCELED', 'REJECTED']:
-                    logging.info(f"Order {order_id} is {order['status']}")
-                    return order
-
+            if order['status'] in ['FILLED', 'CANCELED', 'REJECTED']:
+                logging.info(f"Order {order_id} is {order['status']}")
+                pbar.close()  # Close the progress bar when the condition is met
+                return order
             await asyncio.sleep(1)  # Adjust the sleep interval as needed.
-    except Exception as e:
-        logging.error(f"Failed to monitor order: {e}")
-        raise HTTPException(status_code=500, detail="Failed to monitor order")
 
 
 async def check_open_orders(symbol):

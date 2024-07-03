@@ -15,10 +15,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.schemas.webhook import WebhookPayload
 from trade.orders.create import create_market_order, create_tp_order, create_limit_order, create_final_short_order
+from core.binance_futures import wait_order_id
+
+
+def wait_limit_order_filled(symbol, order_id):
+    wait_order_id(
+        symbol=symbol,
+        order_id=order_id
+    )
 
 
 async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: AsyncSession):
-
     # todo check in db first
     first_order = await create_market_order(
         symbol=payload.symbol,
@@ -28,6 +35,8 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
         session=session
     )
 
+    await session.commit()
+
     grid_orders = await update_grid(payload, webhook_id, session)
 
     # check in дб и binance - сколько уже размещено ордеров
@@ -35,17 +44,6 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
     # Создание ордеров по мартигейлу и сетке
     for index, (price, quantity) in enumerate(zip(grid_orders["long_orders"], grid_orders["martingale_orders"])):
         print("-----------------")
-
-        limit_order = await create_limit_order(
-            symbol=payload.symbol,
-            price=price,
-            quantity=quantity,
-            leverage=payload.open.leverage,
-            webhook_id=webhook_id,
-            session=session,
-        )
-
-        # wait_limit_order_filled()
 
         # надо сперва еще проверять что его нет
         tp_order = await create_tp_order(
@@ -56,6 +54,20 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
             session=session,
         )
 
+        limit_order = await create_limit_order(
+            symbol=payload.symbol,
+            price=price,
+            quantity=quantity,
+            leverage=payload.open.leverage,
+            webhook_id=webhook_id,
+            session=session,
+        )
+
+        binance_order = await wait_order_id(
+            symbol=payload.symbol,
+            order_id=limit_order.binance_id
+        )
+        await session.commit()
 
     # финальный ордер на шорт
     short_order = await create_final_short_order(

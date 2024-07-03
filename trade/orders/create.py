@@ -5,6 +5,8 @@ from typing import Optional
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from core.db_async import async_engine
+
 sys.path.append('../../core')
 sys.path.append('')
 
@@ -58,7 +60,6 @@ async def create_market_order(
 
     pprint(market_order.model_dump())
     session.add(market_order)
-    await session.commit()
 
     return market_order
 
@@ -112,7 +113,6 @@ async def create_tp_order(
     pprint(take_proffit_order.model_dump())
 
     session.add(take_proffit_order)
-    await session.commit()
 
     return take_proffit_order
 
@@ -155,7 +155,6 @@ async def create_limit_order(
     pprint(limit_order.model_dump())
 
     session.add(limit_order)
-    await session.commit()
 
     return limit_order
 
@@ -199,7 +198,5 @@ async def create_final_short_order(
     short_order.status = OrderStatus.IN_PROGRESS
     pprint(short_order.model_dump())
     session.add(short_order)
-
-    await session.commit()
 
     return short_order
