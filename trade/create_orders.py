@@ -19,8 +19,8 @@ from trade.orders.grid import update_grid
 from core.db_async import async_engine, async_session, get_async_session
 
 from core.schemas.webhook import WebhookPayload
-from trade.orders.create import create_market_order, create_tp_order, create_limit_order, open_hedge_postition, \
-    create_hedge_stop_loss_order
+from trade.orders.create import create_market_order, create_tp_order, create_limit_order, \
+    create_hedge_stop_loss_order, open_hedge_position
 from core.binance_futures import wait_order_id, check_open_orders, check_all_orders
 
 
@@ -99,7 +99,7 @@ async def create_orders_in_db(payload: WebhookPayload, webhook_id, session: Asyn
         await session.commit()
 
     # только один раз, когда хватает денег
-    hedge_order = await open_hedge_postition(
+    hedge_order = await open_hedge_position(
         symbol=payload.symbol,
         price=grid_orders["short_order_price"],
         quantity=grid_orders["short_order_amount"],
