@@ -23,6 +23,7 @@ class OrderStatus(enum.Enum):
     NEW = "NEW"
     IN_PROGRESS = "IN_PROGRESS"
     FILLED = "FILLED"
+    CANCELED = "CANCELED"
 
 
 class OrderPositionSide(enum.Enum):
@@ -47,11 +48,12 @@ class OrderType(enum.Enum):
 
     LIMIT = "LIMIT"
     MARKET = "MARKET"
-    STOP = "STOP"
     TAKE_PROFIT = "TAKE_PROFIT"
-    STOP_MARKET = "STOP_MARKET"
-    TAKE_PROFIT_MARKET = "TAKE_PROFIT_MARKET"
-    TRAILING_STOP_MARKET = "TRAILING_STOP_MARKET"
+    # our custom
+    HEDGE_LIMIT = "HEDGE_LIMIT"
+    HEDGE_STOP_LOSS = "HEDGE_STOP_LOSS"
+
+
 
 
 class Order(BaseTable, table=True):

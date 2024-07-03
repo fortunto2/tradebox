@@ -1,5 +1,6 @@
 import asyncio
 from functools import lru_cache
+from typing import List
 
 from binance.um_futures import UMFutures
 import sys
@@ -96,6 +97,7 @@ async def create_order_binance(order: Order):
     if order.type != OrderType.MARKET:
         order_params["price"] = price
         order_params["timeInForce"] = "GTC"
+        order_params["type"] = 'LIMIT' #todo: все ордера лимитные у нас, даже если это TP или Hadge
 
     response = client.new_order(**order_params)
 
@@ -104,6 +106,19 @@ async def create_order_binance(order: Order):
     # except Exception as e:
     #     logging.error(f"Failed to create order: {e}")
     #     raise HTTPException(status_code=500, detail="Failed to create order")
+
+
+async def cancel_order_binance(symbol, order_id):
+    """
+    https://binance-docs.github.io/apidocs/futures/en/#cancel-order-trade
+
+    :param symbol:
+    :param order_id:
+    :return:
+    """
+    response = client.cancel_order(symbol=symbol, orderId=order_id)
+    logging.info(f"Order canceled successfully: {response}")
+    return response
 
 
 async def wait_order(symbol):
@@ -182,12 +197,16 @@ async def check_position(symbol: str) -> (LongPosition, ShortPosition):
     return None, None
 
 
+async def get_order_id(symbol, order_id):
+    order = client.query_order(symbol=symbol, orderId=order_id)
+    return order
+
 async def wait_order_id(symbol, order_id):
     print(f"Monitoring order {symbol}: {order_id}")
     with tqdm(desc="Checking order status", unit="check", position=0, leave=True) as pbar:
 
         while True:
-            order = client.get_open_orders(symbol=symbol, orderId=order_id)
+            order = client.query_order(symbol=symbol, orderId=order_id)
             # Update the description with the current status
             pbar.set_description(f"Order {order_id} current status: {order['status']}")
             pbar.update(1)
@@ -199,7 +218,24 @@ async def wait_order_id(symbol, order_id):
             await asyncio.sleep(1)  # Adjust the sleep interval as needed.
 
 
-async def check_open_orders(symbol):
+async def check_all_orders(symbol: str, orderId: int = None):
+    """
+    Monitor all  orders.
+
+    :param symbol: The symbol of the order to monitor.
+    :return: The order status.
+    """
+    orders = client.get_all_orders(symbol=symbol, orderId=orderId)
+
+    if orders:
+        logging.info(f"Orders: {orders}")
+        return orders
+    else:
+        logging.info(f"No orders found")
+        return None
+
+
+async def check_open_orders(symbol: str):
     """
     Monitor all open orders.
 

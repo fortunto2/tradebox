@@ -6,7 +6,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from core.binance_futures import create_order_binance, monitor_ws, client
 from core.db_async import get_async_session, async_engine
-from core.models.orders import Order, OrderStatus
+from core.models.orders import Order, OrderStatus, OrderType
 import asyncio
 
 
@@ -49,7 +49,7 @@ async def load_new_orders(session: AsyncSession, symbol: str = None):
         .join(subquery, (Order.symbol == subquery.c.symbol) & (Order.order_number == subquery.c.min_order_number))
         .outerjoin(subquery_in_progress, Order.symbol == subquery_in_progress.c.symbol)
         .where(subquery_in_progress.c.symbol == None)
-    # Exclude orders if any order in the group has the status IN_PROGRESS
+        # Exclude orders if any order in the group has the status IN_PROGRESS
     )
 
     result = await session.exec(query)
@@ -93,6 +93,39 @@ async def load_in_progress_orders(session: AsyncSession):
     Load all orders with status IN_PROGRESS from the database.
     """
     query = select(Order).where(Order.status == OrderStatus.IN_PROGRESS)
+    result = await session.exec(query)
+    return result.all()
+
+
+async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.MARKET):
+    """
+    Load all orders with status webhook, status Filled, Market type.
+    """
+    query = select(Order).where(
+        Order.webhook_id == webhook_id,
+        Order.status == OrderStatus.FILLED,
+        Order.type == order_type
+    ).order_by(Order.id.desc())
+
+    result = await session.exec(query)
+    return result.first()
+
+
+async def db_get_all_order(
+        webhook_id,
+        order_status: OrderStatus,
+        order_type: OrderType,
+        session: AsyncSession,
+):
+    """
+    Load all orders by webhook
+    """
+    query = select(Order).where(
+        Order.webhook_id == webhook_id,
+        Order.status == order_status,
+        Order.type == order_type
+    ).order_by(Order.id.desc())
+
     result = await session.exec(query)
     return result.all()
 

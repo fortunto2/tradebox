@@ -6,21 +6,21 @@
   "open": {
     "enabled": true,
     "amountType": "amount",
-    "amount": "20",
-    "leverage": "25"
+    "amount": "60",
+    "leverage": "20"
   },
   "settings": {
-    "deposit": "10",
-    "extramarg": "10",
+    "deposit": "35",
+    "extramarg": "35",
     "tp": "0.42",
     "trail_1": "0.03",
     "trail_2": "0.01",
     "offset_short": "0.5",
     "sl_short": "0.5",
-    "grid_long": "0.10|0.08|0.18",
-    "mg_long": "10.00|13.59|18.20",
+    "grid_long": "0.36|0.29|0.65|0.94|1.58",
+    "mg_long": "33.3|45.26|61.03|81.98|109.9",
     "trail_step": "0.01",
-    "order_quan": "3",
+    "order_quan": "5",
     "sens": "252",
     "time_allert": "2024-06-24 00:00:00",
     "time_frame": "1h"
