@@ -1,5 +1,6 @@
 import json
 import logging
+from pprint import pprint
 
 from pydantic import ValidationError
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -23,14 +24,21 @@ def on_message(ws, msg):
         order = Order.parse_obj(message_dict.get('o'))  # Assuming 'o' contains the order details
         # print(f"Order status: {order.order_status}")
         if order.order_status in ['FILLED', 'CANCELED', 'REJECTED']:
-            print(f"Order completed with status: {order.order_status}")
+            # side, position_side, sttaus, quantity, price
+            print(f"Order status: {order.order_status}")
+            print(f"Order side: {order.side}")
+            print(f"Order type: {order.order_type}")
+            print(f"Order position side: {order.position_side}")
+            print(f"Order quantity: {order.original_quantity}")
+            print(f"Order price: {order.original_price}")
+
     elif event_type == 'ACCOUNT_UPDATE':
         # Parse the message using the AccountUpdateEvent model
         data = UpdateData.parse_obj(message_dict['a'])
-        print(f"Account update: {data}")
         for position in data.positions:
-            # print(f"Position: {position}")
-            print(f'PNL: {position.unrealized_pnl}')
+            # print pnl and position info
+            print(f'PNL: {position.unrealized_pnl}, Position: {position.position_side}')
+            pprint(position.model_dump())
 
     # except json.JSONDecodeError:
     #     print("Failed to decode JSON message.")
