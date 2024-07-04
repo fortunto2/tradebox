@@ -23,6 +23,7 @@ class Settings(BaseModel):
     trail_1: float
     trail_2: float
     offset_short: float
+    offset_pluse: float
     sl_short: float
     grid_long: Union[str, List[float]]
     mg_long: Union[str, List[float]]

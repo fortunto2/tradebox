@@ -266,6 +266,11 @@ def get_current_price(symbol: str) -> Decimal:
         raise HTTPException(status_code=500, detail="Failed to get current price")
 
 
+def get_position_closed_pnl(symbol: str, order_id: int) -> Decimal:
+    orders = client.get_account_trades(symbol, orderId=order_id)
+    return Decimal(orders[0].get('realizedPnl'))
+
+
 def on_message(ws, msg):
     logging.info(f"Received message: {msg}")
     if msg['e'] == 'ORDER_TRADE_UPDATE':

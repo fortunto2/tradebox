@@ -16,6 +16,7 @@
     "trail_1": "0.03",
     "trail_2": "0.01",
     "offset_short": "0.5",
+    "offset_pluse": "0.5",
     "sl_short": "0.5",
     "grid_long": "0.10|0.08|0.18",
     "mg_long": "10.00|13.59|18.20",

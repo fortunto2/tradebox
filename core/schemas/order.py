@@ -25,7 +25,7 @@
 #     "selfTradePreventionMode": "NONE", //self trading preventation mode
 #     "goodTillDate": 0                  //order pre-set auot cancel time for TIF GTD order
 # }
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, field_validator
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Optional
@@ -58,7 +58,7 @@ class BinanceOrder(BaseModel):
     selfTradePreventionMode: Literal['NONE']  # Add other modes if they exist
     goodTillDate: Optional[int] = None
 
-    @validator('updateTime', pre=True)
+    @field_validator('updateTime', mode='pre')
     def convert_timestamp(cls, v):
         return datetime.fromtimestamp(v / 1000.0)  # Convert milliseconds to seconds
 

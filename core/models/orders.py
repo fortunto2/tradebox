@@ -55,6 +55,23 @@ class OrderType(enum.Enum):
 
 
 
+class OrderType(enum.Enum):
+    """
+    Type	Additional mandatory parameters
+    LIMIT	timeInForce, quantity, price
+    MARKET	quantity
+    STOP/TAKE_PROFIT	quantity, price, stopPrice
+    STOP_MARKET/TAKE_PROFIT_MARKET	stopPrice
+    TRAILING_STOP_MARKET	quantity,callbackRate
+    """
+
+    LIMIT = "LIMIT"
+    MARKET = "MARKET"
+    TAKE_PROFIT = "TAKE_PROFIT"
+    # our custom
+    HEDGE_LIMIT = "HEDGE_LIMIT"
+    HEDGE_STOP_LOSS = "HEDGE_STOP_LOSS"
+
 
 class Order(BaseTable, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
