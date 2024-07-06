@@ -55,15 +55,20 @@ class TradeMonitor:
         print(msg)
         message_dict = json.loads(msg)
         event_type = message_dict.get('e')
-        if event_type == 'aggTrade':
-            await self.handle_agg_trade(message_dict)
-        elif event_type == 'ORDER_TRADE_UPDATE':
-            await self.handle_order_update(message_dict)
-        elif event_type == 'ACCOUNT_UPDATE':
-            await self.handle_account_update(message_dict)
 
-    async def handle_agg_trade(self, message_dict):
-        event = AggregatedTradeEvent.parse_obj(message_dict)
+        if event_type == 'aggTrade':
+            event = AggregatedTradeEvent.parse_obj(message_dict)
+            await self.handle_agg_trade(event)
+
+        elif event_type == 'ORDER_TRADE_UPDATE':
+            event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
+            await self.handle_order_update(event)
+
+        elif event_type == 'ACCOUNT_UPDATE':
+            event = UpdateData.parse_obj(message_dict['a'])
+            await self.handle_account_update(event)
+
+    async def handle_agg_trade(self, event: AggregatedTradeEvent):
         trade_price = Decimal(event.price)
 
         self.long_pnl = 0
@@ -83,18 +88,17 @@ class TradeMonitor:
             else:
                 print(f"=Loss: {_diff} USDT")
 
-    async def handle_order_update(self, message_dict):
+    async def handle_order_update(self, event: OrderTradeUpdate):
         async with AsyncSession(async_engine) as session:
-            order_bi: OrderTradeUpdate = OrderTradeUpdate.parse_obj(message_dict.get('o'))
-            if order_bi.order_status in ['FILLED', 'CANCELED', 'REJECTED']:
-                print(f"Order status: {order_bi.order_status}")
-                print(f"Order side: {order_bi.side}")
-                print(f"Order type: {order_bi.order_type}")
-                print(f"Order position side: {order_bi.position_side}")
-                print(f"Order quantity: {order_bi.original_quantity}")
-                print(f"Order price: {order_bi.original_price}")
+            if event.order_status in ['FILLED', 'CANCELED', 'REJECTED']:
+                print(f"Order status: {event.order_status}")
+                print(f"Order side: {event.side}")
+                print(f"Order type: {event.order_type}")
+                print(f"Order position side: {event.position_side}")
+                print(f"Order quantity: {event.original_quantity}")
+                print(f"Order price: {event.original_price}")
 
-                order_binance_id = order_bi.order_id
+                order_binance_id = event.order_id
                 print(f"Order binance_id: {order_binance_id}")
 
                 order = await db_get_order_binance_id(order_binance_id, session)
@@ -103,18 +107,17 @@ class TradeMonitor:
                     return
 
                 order.binance_id = order_binance_id
-                order.status = order_bi.order_status
-                order.binance_status = order_bi.order_status
+                order.status = event.order_status
+                order.binance_status = event.order_status
 
-                if order.type == OrderType.LIMIT and order_bi.order_status == 'FILLED':
+                if order.type == OrderType.LIMIT and event.order_status == 'FILLED':
                     print(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
                     await grid_make_limit_and_tp_order(webhook_id=order.webhook_id, session=session)
 
                 await session.commit()
 
-    async def handle_account_update(self, message_dict):
-        data = UpdateData.parse_obj(message_dict['a'])
-        for position in data.positions:
+    async def handle_account_update(self, event: UpdateData):
+        for position in event.positions:
 
             if position.position_side == 'LONG':
                 self.long_position_qty = Decimal(position.position_amount)
@@ -129,6 +132,7 @@ class TradeMonitor:
 
 
 async def main():
+
     trade_monitor = TradeMonitor('JOEUSDT')
     await trade_monitor.monitor_events()
 
