@@ -28,7 +28,10 @@ class TradeMonitor:
         self.short_entry_price = Decimal(0)
         self.client = UMFuturesWebsocketClient(on_message=self.on_message)
 
-    async def monitor_symbol(self):
+        self.long_pnl = 0
+        self.short_pnl = 0
+
+    async def monitor_events(self):
         position_long, position_short = await check_position(self.symbol)
         if position_long:
             self.long_position_qty = position_long.positionAmt
@@ -62,17 +65,17 @@ class TradeMonitor:
         event = AggregatedTradeEvent.parse_obj(message_dict)
         trade_price = Decimal(event.price)
 
-        long_pnl = 0
+        self.long_pnl = 0
         print(f'-----{event.symbol}------')
 
         if self.long_position_qty != 0:
-            long_pnl = round((trade_price - self.long_entry_price) * self.long_position_qty, 2)
-            print(f"+Long PNL: {long_pnl}")
+            self.long_pnl = round((trade_price - self.long_entry_price) * self.long_position_qty, 2)
+            print(f"+Long PNL: {self.long_pnl}")
         if self.short_position_qty != 0:
-            short_pnl = round((trade_price - self.short_entry_price) * self.short_position_qty, 2)
-            print(f"-Short PNL: {short_pnl}")
+            self.short_pnl = round((trade_price - self.short_entry_price) * self.short_position_qty, 2)
+            print(f"-Short PNL: {self.short_pnl}")
 
-            _diff = short_pnl + long_pnl
+            _diff = self.long_pnl + self.short_pnl
             if _diff > 0:
                 print(f"=Profit: {_diff} USDT")
                 # close all positions, orders all
@@ -124,7 +127,7 @@ class TradeMonitor:
 
 async def main():
     trade_monitor = TradeMonitor('JOEUSDT')
-    await trade_monitor.monitor_symbol()
+    await trade_monitor.monitor_events()
 
 
 if __name__ == '__main__':
