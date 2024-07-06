@@ -110,6 +110,8 @@ class TradeMonitor:
                     print(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
                     await grid_make_limit_and_tp_order(webhook_id=order.webhook_id, session=session)
 
+                await session.commit()
+
     async def handle_account_update(self, message_dict):
         data = UpdateData.parse_obj(message_dict['a'])
         for position in data.positions:
