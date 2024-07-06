@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
 from core.binance_futures import check_position_side_dual, check_position
-from trade.create_orders import create_orders_in_db
+from trade.orders.create import create_first_orders
 from core.models.webhook import WebHook
 from core.schemas.webhook import WebhookPayload
 from core.tg_client import TelegramClient
@@ -30,7 +30,6 @@ async def on_startup():
 @app.post("/webhook")
 async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(get_async_session)):
     logging.info(f"Received webhook JSON payload: {body.json()}")
-
 
     # firstly check existing orders
     # open_orders = await check_open_orders(symbol)
@@ -64,8 +63,8 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     # current_price = get_current_price(symbol)
     # logging.info(f"Current price for {symbol}: {current_price}")
 
-    first_order, grid_orders, short_order = await create_orders_in_db(body, webhook.id, session)
-    tg.send_message(message=first_order.model_dump_json())
+    await create_first_orders(body, webhook.id, session)
+    # tg.send_message(message=first_order.model_dump_json())
 
     return {"status": "success"}
 

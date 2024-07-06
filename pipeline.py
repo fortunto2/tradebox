@@ -9,7 +9,7 @@ from core.db_async import async_engine
 from core.binance_futures import create_order_binance, client
 from prefect import flow, task
 
-from trade.handle_orders import load_new_orders
+from core.views.handle_orders import load_new_orders
 
 # Configuring the logging level and logger.
 logging.basicConfig(level=logging.INFO)

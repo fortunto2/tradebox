@@ -65,7 +65,7 @@ class OrderType(enum.Enum):
     TAKE_PROFIT_MARKET = "TAKE_PROFIT_MARKET"
 
 
-class Order(BaseModel):
+class OrderTradeUpdate(BaseModel):
     symbol: str = Field(alias="s")
     client_order_id: str = Field(alias="c")
     side: Literal["SELL", "BUY"] = Field(alias="S")
@@ -104,4 +104,4 @@ class OrderTradeUpdateEvent(BaseModel):
     event_type: str = Field(alias="e")
     event_time: int = Field(alias="E")
     transaction_time: int = Field(alias="T")
-    order: Order = Field(alias="o")
+    order: OrderTradeUpdate = Field(alias="o")
