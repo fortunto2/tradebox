@@ -13,8 +13,8 @@ sys.path.append('../core')
 from core.db_async import async_engine
 
 from core.schemas.webhook import WebhookPayload
-from trade.orders.create import create_tp_order, create_limit_order, \
-    create_first_orders, make_hedge_by_pnl
+from trade.orders.orders_create import create_tp_order, create_limit_order
+from trade.orders.orders_processing import create_first_orders, make_hedge_by_pnl
 
 
 async def main(payload: WebhookPayload):

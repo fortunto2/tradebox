@@ -16,7 +16,7 @@ from core.schemas.events.account_update import AccountUpdateEvent, UpdateData
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdateEvent, OrderTradeUpdate
 from core.views.handle_orders import db_get_order_binance_id
-from trade.orders.create import grid_make_limit_and_tp_order
+from trade.orders.orders_processing import grid_make_limit_and_tp_order
 
 
 class TradeMonitor:

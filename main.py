@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
 from core.binance_futures import check_position_side_dual, check_position
-from trade.orders.create import create_first_orders
+from trade.orders.orders_processing import create_first_orders
 from core.models.webhook import WebHook
 from core.schemas.webhook import WebhookPayload
 from core.tg_client import TelegramClient
