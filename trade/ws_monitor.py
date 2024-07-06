@@ -22,6 +22,7 @@ from trade.orders.create import grid_make_limit_and_tp_order
 class TradeMonitor:
     def __init__(self, symbol):
         self.symbol = symbol
+
         self.long_position_qty = Decimal(0)
         self.long_entry_price = Decimal(0)
         self.short_position_qty = Decimal(0)
@@ -105,7 +106,7 @@ class TradeMonitor:
                 order.status = order_bi.order_status
                 order.binance_status = order_bi.order_status
 
-                if order.type == OrderType.LIMIT:
+                if order.type == OrderType.LIMIT and order.status == OrderStatus.FILLED:
                     print(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
                     await grid_make_limit_and_tp_order(webhook_id=order.webhook_id, session=session)
 
