@@ -64,7 +64,7 @@ async def load_in_progress_orders(session: AsyncSession):
     return result.all()
 
 
-async def get_webhook(webhook_id: int, session: AsyncSession) -> WebHook:
+async def get_webhook(webhook_id: str, session: AsyncSession) -> WebHook:
     query = select(WebHook).where(WebHook.id == webhook_id)
     result = await session.exec(query)
     return result.first()

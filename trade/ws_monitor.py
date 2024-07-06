@@ -34,6 +34,8 @@ class TradeMonitor:
         self.short_pnl = 0
 
         self.orders_in_the_grid = True # есть еще ордера в сетке
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
 
     async def monitor_events(self):
         position_long, position_short = await check_position(self.symbol)
@@ -52,7 +54,11 @@ class TradeMonitor:
         self.client.user_data(listen_key=listen_key)
 
     def on_message(self, ws, msg):
-        asyncio.create_task(self.handle_message(msg))
+        # Schedule the coroutine from a synchronous context using the instance's event loop
+        if self.loop.is_closed():
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+        asyncio.run(self.handle_message(msg))
 
     async def handle_message(self, msg):
         # print(msg)
@@ -104,7 +110,7 @@ class TradeMonitor:
                 order_binance_id = event.order_id
                 print(f"Order binance_id: {order_binance_id}")
 
-                order = await db_get_order_binance_id(order_binance_id, session)
+                order: Order = await db_get_order_binance_id(order_binance_id, session)
                 if not order:
                     print(f"!!!!!Order not found in DB - {order_binance_id}")
                     return
@@ -112,6 +118,9 @@ class TradeMonitor:
                 order.binance_id = order_binance_id
                 order.status = event.order_status
                 order.binance_status = event.order_status
+                await session.flush()
+
+                print('orders_in_the_grid: ', self.orders_in_the_grid)
 
                 if order.type == OrderType.LIMIT and self.orders_in_the_grid:
                     print(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
@@ -119,9 +128,12 @@ class TradeMonitor:
                     self.orders_in_the_grid = await grid_make_limit_and_tp_order(webhook_id=order.webhook_id, session=session)
 
                 if order.type == OrderType.HEDGE_STOP_LOSS and not self.orders_in_the_grid:
+                    print(f"Order {order_binance_id} HEDGE_STOP_LOSS start make_hedge_by_pnl")
+
+                    payload = WebhookPayload(**order.webhook.model_dump())
 
                     await make_hedge_by_pnl(
-                        payload=WebhookPayload.parse_raw(order.payload),
+                        payload=payload, #todo: check
                         webhook_id=order.webhook_id,
                         hedge_stop_loss_order_binance_id=order_binance_id,
                         session=session

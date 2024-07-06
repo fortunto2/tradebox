@@ -190,7 +190,12 @@ async def grid_make_limit_and_tp_order(
     if not payload:
         # get payload from db by webhook_id
         webhook: WebHook = await get_webhook(webhook_id=webhook_id, session=session)
-        payload = WebhookPayload(**webhook.model_dump())
+        if webhook:
+            payload = WebhookPayload(**webhook.model_dump())
+
+    if not payload:
+        print("payload not found, webhook_id:", webhook_id)
+        return False
 
     grid_orders = await update_grid(payload)
 

@@ -26,7 +26,7 @@ async def main(payload: WebhookPayload):
 
         wh_id = randint(1, 1000)
 
-        await create_first_orders(payload, wh_id, session)
+        await create_first_orders(payload, 1, session)
         # await get_position_closed_pnl('JOEUSDT')
 
 

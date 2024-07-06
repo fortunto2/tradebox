@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
 from core.binance_futures import check_position_side_dual, check_position
+from core.schemas.position import LongPosition
 from trade.orders.orders_processing import create_first_orders
 from core.models.webhook import WebHook
 from core.schemas.webhook import WebhookPayload
@@ -37,9 +38,11 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     #     logging.info(f"Open orders found for symbol: {symbol}. Ignoring new webhook.")
     #     return {"status": "ignored", "reason": "open orders found"}
 
-    position = await check_position(symbol=body.symbol)
-    if float(position.get("entryPrice")) > 0:
-        print(position)
+    position_long, _ = await check_position(symbol=body.symbol)
+    position_long: LongPosition
+
+    if float(position_long.entryPrice) > 0:
+        print(position_long)
         print(f"Position found for symbol: {body.symbol}. Ignoring new webhook.")
         return {"status": "ignored", "reason": f"position found for {body.symbol}"}
 
