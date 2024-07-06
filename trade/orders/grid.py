@@ -96,8 +96,6 @@ def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal, fee_p
 
 async def update_grid(
         payload: WebhookPayload,
-        webhook_id,
-        session: AsyncSession
 ):
     position_long, _ = await check_position(symbol=payload.symbol)
     position_long: LongPosition
@@ -108,27 +106,3 @@ async def update_grid(
         raise ValueError("Недостаточно средств для открытия позиции.")
 
     return grid_orders
-
-    # long_buy_orders = []
-    #
-    # # Создание ордеров по мартигейлу и сетке
-    # for index, (price, quantity) in enumerate(zip(grid_orders["long_orders"], grid_orders["martingale_orders"])):
-    #     print("-----------------")
-    #
-    #     order = Order(
-    #         symbol=payload.symbol,
-    #         side=OrderSide.BUY,
-    #         price=price,
-    #         quantity=quantity,
-    #         leverage=payload.open.leverage,
-    #         position_side=OrderPositionSide.LONG,
-    #         type=OrderType.LIMIT,
-    #         webhook_id=webhook_id,
-    #         order_number=index + 1
-    #     )
-    #     pprint(order.model_dump())
-    #     session.add(order)
-    #
-    #     long_buy_orders.append(order)
-    #
-    # order_binance_id = await create_order_binance(long_buy_orders[0])

@@ -8,10 +8,14 @@ from pydantic import ValidationError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from core.binance_futures import create_order_binance, monitor_ws, client, check_position
-from core.db_async import get_async_session, async_engine
+from core.db_async import get_async_session, async_engine, async_session
+from core.models.orders import OrderStatus, OrderType
+from core.models.orders import Order as OrderBinance
 from core.schemas.events.account_update import AccountUpdateEvent, UpdateData
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdateEvent, Order
+from trade.create_orders import get_grid_orders, grid_make_limit_and_tp_order
+from trade.handle_orders import db_get_order
 
 # Глобальные переменные для хранения информации о длинной и короткой позициях
 long_position_qty = Decimal(0)
@@ -25,6 +29,9 @@ def on_message(ws, msg):
 
     message_dict = json.loads(msg)
     event_type = message_dict.get('e')
+
+    # session = AsyncSession(async_engine)
+    # session = async_session
 
     if event_type == 'aggTrade':
         event = AggregatedTradeEvent.parse_obj(message_dict)
@@ -47,16 +54,27 @@ def on_message(ws, msg):
             else:
                 print(f"=Loss: {_diff} USDT")
 
-
     elif event_type == 'ORDER_TRADE_UPDATE':
-        order = Order.parse_obj(message_dict.get('o'))
-        if order.order_status in ['FILLED', 'CANCELED', 'REJECTED']:
-            print(f"Order status: {order.order_status}")
-            print(f"Order side: {order.side}")
-            print(f"Order type: {order.order_type}")
-            print(f"Order position side: {order.position_side}")
-            print(f"Order quantity: {order.original_quantity}")
-            print(f"Order price: {order.original_price}")
+        order_bi: Order = Order.parse_obj(message_dict.get('o'))
+        if order_bi.order_status in ['FILLED', 'CANCELED', 'REJECTED']:
+            print(f"Order status: {order_bi.order_status}")
+            print(f"Order side: {order_bi.side}")
+            print(f"Order type: {order_bi.order_type}")
+            print(f"Order position side: {order_bi.position_side}")
+            print(f"Order quantity: {order_bi.original_quantity}")
+            print(f"Order price: {order_bi.original_price}")
+
+            order = asyncio.run(db_get_order(order_bi.order_id))
+            order.binance_id = order_bi.order_id
+            order.status = order_bi.order_status
+            order.binance_status = order_bi.order_status
+
+            if order.type == OrderType.LIMIT:
+                print(f"Order {order.order_id} LIMIT start grid_make_limit_and_tp_order")
+                asyncio.run(grid_make_limit_and_tp_order(webhook_id=order.webhook_id))
+
+            # await session.commit()
+
 
     elif event_type == 'ACCOUNT_UPDATE':
         data = UpdateData.parse_obj(message_dict['a'])
@@ -72,7 +90,6 @@ def on_message(ws, msg):
                 short_entry_price = Decimal(position.breakeven_price)
                 print(f'UPDATE Short PNL: {position.unrealized_pnl}')
                 pprint(position)
-
 
 
 async def monitor_symbol(symbol: str):

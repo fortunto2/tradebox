@@ -156,7 +156,7 @@ async def create_limit_order(
     :param session:
     :return:
     """
-    print("Limit order:")
+    print("LONG-BUY-LIMIT order:")
 
     limit_order = Order(
         position_side=OrderPositionSide.LONG,
@@ -200,7 +200,7 @@ async def open_hedge_position(
     :param session:
     :return:
     """
-    print("Final short order:")
+    print("SHORT-SELL-HEDGE_LIMIT:")
 
     short_order = Order(
         position_side=OrderPositionSide.SHORT,
@@ -244,7 +244,7 @@ async def create_hedge_stop_loss_order(
     :param session:
     :return:
     """
-    print("Final short order:")
+    print("SHORT-BUY-HEDGE_STOP_LIMIT:")
 
     _, position_short = await check_position(symbol=symbol)
     position_short: ShortPosition

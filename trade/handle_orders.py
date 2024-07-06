@@ -6,8 +6,10 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from core.binance_futures import create_order_binance, monitor_ws, client
 from core.db_async import get_async_session, async_engine
-from core.models.orders import Order, OrderStatus, OrderType
+from core.models.orders import Order, OrderStatus, OrderType, OrderPositionSide, OrderSide
 import asyncio
+
+from core.models.webhook import WebHook
 
 
 async def load_new_orders(session: AsyncSession, symbol: str = None):
@@ -97,6 +99,13 @@ async def load_in_progress_orders(session: AsyncSession):
     return result.all()
 
 
+async def get_webhook(webhook_id: int, session: AsyncSession) -> WebHook:
+
+    query = select(WebHook).where(WebHook.id == webhook_id)
+    result = await session.exec(query)
+    return result.first()
+
+
 async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.MARKET):
     """
     Load all orders with status webhook, status Filled, Market type.
@@ -109,6 +118,46 @@ async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderT
 
     result = await session.exec(query)
     return result.first()
+
+
+async def db_get_orders(
+        webhook_id,
+        order_status: OrderStatus,
+        position_side: OrderPositionSide,
+        order_type: OrderType,
+        order_side: OrderSide,
+        session: AsyncSession,
+):
+    """
+    Load all orders grid
+    """
+    query = select(Order).where(
+        Order.webhook_id == webhook_id,
+        Order.status == order_status,
+        Order.type == order_type,
+        Order.position_side == position_side,
+        Order.side == order_side
+    ).order_by(Order.id.desc())
+
+    result = await session.exec(query)
+    return result.all()
+
+
+async def db_get_order(
+        order_id,
+        session: AsyncSession = None
+) -> Order:
+
+    if session is None:
+        async with get_async_session() as session:
+            return await db_get_order(order_id, session)
+
+    query = select(Order).where(
+        Order.id == order_id,
+    )
+
+    result = await session.exec(query)
+    return result.one_or_none()
 
 
 async def db_get_all_order(
