@@ -2,11 +2,12 @@ import enum
 from decimal import Decimal
 from typing import Optional, Literal, Dict, List
 
-from sqlmodel import SQLModel, Field, JSON, Relationship
+from pydantic import field_validator
+from sqlmodel import SQLModel, Field, JSON, Relationship, Column
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from core.models.orders import OrderPositionSide, OrderSide
-from core.schemas.webhook import WebhookPayload
+from core.schemas.webhook import WebhookPayload, OpenOrder, Settings
 
 
 class WebHook(SQLModel, table=True):
@@ -15,14 +16,13 @@ class WebHook(SQLModel, table=True):
     side: OrderSide
     positionSide: OrderPositionSide
     symbol: str
-    open: Optional[dict] = Field(nullable=True, sa_type=JSON)
-    settings: Optional[dict] = Field(nullable=True, sa_type=JSON)
+    open: OpenOrder = Field(default_factory=dict, sa_column=Column(JSON))
+    settings: Settings = Field(default_factory=dict, sa_column=Column(JSON))
     status: str = 'new'
 
     orders: List["Order"] = Relationship(back_populates="webhook")
 
     def from_payload(self, payload):
-
         self.name = payload.name
         self.side = payload.side
         self.positionSide = payload.positionSide

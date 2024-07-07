@@ -1,12 +1,15 @@
 import logging
 
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from core.db_async import async_engine
 from core.models.orders import Order, OrderStatus, OrderType, OrderPositionSide, OrderSide
 
 from core.models.webhook import WebHook
+from core.schemas.webhook import WebhookPayload
 
 
 async def load_new_orders(session: AsyncSession, symbol: str = None):
@@ -101,7 +104,7 @@ async def db_get_orders(
         Order.type == order_type,
         Order.position_side == position_side,
         Order.side == order_side
-    ).order_by(Order.id.desc())
+    ).order_by(Order.id.asc())
 
     result = await session.exec(query)
     return result.all()
@@ -123,12 +126,10 @@ async def db_get_order_binance_id(
         order_binance_id,
         session: AsyncSession
 ) -> Order:
-    query = select(Order).where(
-        Order.binance_id == order_binance_id,
-    )
+    query = select(Order).options(joinedload(Order.webhook)).where(Order.binance_id == order_binance_id)
 
     result = await session.exec(query)
-    return result.one_or_none()
+    return result.unique().one()
 
 
 async def db_get_all_order(
@@ -161,3 +162,28 @@ async def get_next_order(session: AsyncSession, symbol: str):
         next_order.status = OrderStatus.IN_PROGRESS
         await session.commit()
     return next_order
+
+
+async def main():
+
+    async with AsyncSession(async_engine) as session:
+        order = await db_get_order_binance_id(1594495326, session)
+        webhook = order.webhook
+
+        payload = WebhookPayload(
+            name=webhook.name,
+            side=order.side,
+            positionSide=order.position_side,
+            symbol=order.symbol,
+            open=webhook.open,
+            settings=webhook.settings
+        )
+
+        print(payload.model_dump())
+
+
+if __name__ == "__main__":
+
+    import asyncio
+
+    asyncio.run(main())

@@ -17,7 +17,7 @@ from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdateEvent, OrderTradeUpdate
 from core.schemas.webhook import WebhookPayload
 from core.views.handle_orders import db_get_order_binance_id
-from trade.orders.orders_processing import grid_make_limit_and_tp_order, make_hedge_by_pnl
+from trade.orders.orders_processing import grid_make_limit_and_tp_order, make_hedge_by_pnl, check_orders_in_the_grid
 
 
 class TradeMonitor:
@@ -33,7 +33,6 @@ class TradeMonitor:
         self.long_pnl = 0
         self.short_pnl = 0
 
-        self.orders_in_the_grid = True # есть еще ордера в сетке
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
@@ -120,17 +119,39 @@ class TradeMonitor:
                 order.binance_status = event.order_status
                 await session.flush()
 
-                print('orders_in_the_grid: ', self.orders_in_the_grid)
 
-                if order.type == OrderType.LIMIT and self.orders_in_the_grid:
+                webhook = order.webhook
+
+                # todo rewrite all to sql model
+                payload = WebhookPayload(
+                    name=webhook.name,
+                    side=order.side,
+                    positionSide=order.position_side,
+                    symbol=order.symbol,
+                    open=webhook.open,
+                    settings=webhook.settings
+                )
+
+                orders_in_the_grid = True
+
+                filled_orders, grid_orders, grid = await check_orders_in_the_grid(
+                    payload, order.webhook_id, session)
+
+                # когда последний заканчивет сетку
+                if len(filled_orders) >= len(grid):
+                    print(f"stop: filled_orders {filled_orders} >= grid_orders {grid_orders}")
+                    orders_in_the_grid = False
+
+                if order.type == OrderType.LIMIT and orders_in_the_grid:
                     print(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
 
-                    self.orders_in_the_grid = await grid_make_limit_and_tp_order(webhook_id=order.webhook_id, session=session)
+                    await grid_make_limit_and_tp_order(
+                        webhook_id=order.webhook_id,
+                        payload=payload,
+                        session=session)
 
-                if order.type == OrderType.HEDGE_STOP_LOSS and not self.orders_in_the_grid:
+                if order.type == OrderType.HEDGE_STOP_LOSS and not orders_in_the_grid:
                     print(f"Order {order_binance_id} HEDGE_STOP_LOSS start make_hedge_by_pnl")
-
-                    payload = WebhookPayload(**order.webhook.model_dump())
 
                     await make_hedge_by_pnl(
                         payload=payload, #todo: check

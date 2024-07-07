@@ -1,7 +1,12 @@
+import json
 from decimal import Decimal
 import sys
 
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+from core.db_async import async_engine
+from core.models.orders import OrderType
+from core.views.handle_orders import db_get_last_order
 
 sys.path.append('../../core')
 sys.path.append('')
@@ -50,11 +55,6 @@ def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal, fee_p
     last_averaging_long_order_price = long_orders[-1]
     short_order_price = Decimal(last_averaging_long_order_price) * Decimal(1 - offset_short_percentage / 100)
 
-    # Расчет стоп-лосса для короткой позиции
-    stop_loss_short_order_price = Decimal(short_order_price) * Decimal(1 + stop_loss_short_percentage / 100)
-
-    short_order_amount = Decimal(payload.settings.extramarg * payload.open.leverage) / short_order_price
-
     # Проверка корректности данных для количества шагов Мартингейла и количества ордеров
     if len(martingale_steps) != order_quantity:
         raise ValueError("Количество данных в шагах Мартингейла не соответствует количеству ордеров order_quantity.")
@@ -82,9 +82,6 @@ def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal, fee_p
     result = {
         "take_profit_order_price": take_profit_order_price,
         "long_orders": long_orders,
-        "short_order_price": short_order_price,
-        "short_order_amount": short_order_amount,
-        "stop_loss_short_order_price": stop_loss_short_order_price,
         # считаем каждый раз после SHORT, после подтерждения что позиция открылась
         "martingale_orders": martingale_orders,
         "sufficient_funds": sufficient_funds,
@@ -96,13 +93,33 @@ def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal, fee_p
 
 async def update_grid(
         payload: WebhookPayload,
+        webhook_id: int,
+        session: AsyncSession
 ):
-    position_long, _ = await check_position(symbol=payload.symbol)
-    position_long: LongPosition
 
-    grid_orders = calculate_grid_orders(payload, position_long.markPrice)
+    order_market = await db_get_last_order(
+        webhook_id=webhook_id, session=session, order_type=OrderType.MARKET
+    )
+
+    if order_market is None:
+        raise ValueError("Не найден Market ордер.")
+
+    order_market_price = order_market.price
+
+    grid_orders = calculate_grid_orders(payload, order_market_price)
 
     if grid_orders["sufficient_funds"] is False:
         raise ValueError("Недостаточно средств для открытия позиции.")
 
     return grid_orders
+
+
+if __name__ == '__main__':
+
+    with open('tests/joe.json', 'r') as file:
+        data = json.load(file)
+
+    calculate_grid_orders(
+        payload=WebhookPayload(**data),
+        initial_price=Decimal('0.9949999999999999955591079015')
+    )

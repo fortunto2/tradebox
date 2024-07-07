@@ -52,8 +52,8 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
         side=body.side.value,
         positionSide=body.positionSide.value,
         symbol=body.symbol,
-        open=body.open.model_dump_json(),
-        settings=body.settings.model_dump_json()
+        open=body.open,
+        settings=body.settings
     )
     session.add(webhook)
     await session.commit()
