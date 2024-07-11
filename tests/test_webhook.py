@@ -12,7 +12,7 @@ from core.schemas.webhook import WebhookPayload
 
 def test_webhook():
     # Загрузка данных из файла example.json
-    with open('tests/joe.json', 'r') as file:
+    with open('tests/bnx.json', 'r') as file:
         data = json.load(file)
 
     payload = WebhookPayload(**data)

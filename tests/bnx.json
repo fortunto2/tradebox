@@ -2,11 +2,11 @@
   "name": "APIKEY",
   "side": "buy",
   "positionSide": "long",
-  "symbol": "JOEUSDT",
+  "symbol": "BNXUSDT",
   "open": {
     "enabled": true,
     "amountType": "amount",
-    "amount": "20",
+    "amount": "10",
     "leverage": "25"
   },
   "settings": {
@@ -15,9 +15,9 @@
     "tp": "0.42",
     "trail_1": "0.03",
     "trail_2": "0.01",
-    "offset_short": "0.2",
+    "offset_short": "0.1",
     "offset_pluse": "0.2",
-    "sl_short": "0.5",
+    "sl_short": "0.2",
     "grid_long": "0.1",
     "mg_long": "10.00",
     "trail_step": "0.01",

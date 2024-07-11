@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from core.binance_futures import get_position_closed_pnl, check_position, check_all_orders, wait_order_id
 from core.db_async import async_engine
-from core.models.orders import OrderType, OrderStatus, OrderPositionSide, OrderSide, OrderBinanceStatus
+from core.models.orders import OrderType, OrderStatus, OrderPositionSide, OrderSide, OrderBinanceStatus, Order
 from core.models.webhook import WebHook
 from core.schemas.position import ShortPosition
 
@@ -43,8 +43,6 @@ async def open_short_position_loop(
         webhook_id,
         session: AsyncSession,
         order_binance_id: int,
-        quantity: Decimal = None,
-        hedge_price: Decimal = None,
 ):
     extramarg = Decimal(payload.settings.extramarg)
 
@@ -53,17 +51,19 @@ async def open_short_position_loop(
     pnl = get_position_closed_pnl(payload.symbol, int(order_binance_id))
     print("pnl:", pnl)
 
-    extramarg = Decimal(payload.settings.extramarg) - pnl
+    extramarg = Decimal(payload.settings.extramarg) + pnl
 
     if extramarg * Decimal(payload.open.leverage) < 11:
         #  проверку что не extramarg не должен быть менее 11 долларов * плече
         print("Not enough money")
         return
 
-    _, position_short = await check_position(symbol=payload.symbol)
-    position_short: ShortPosition
+    # _, position_short = await check_position(symbol=payload.symbol)
+    # position_short: ShortPosition
 
-    hedge_price = Decimal(position_short.entryPrice) * (1 - Decimal(payload.settings.offset_pluse) / 100)
+    short_order: Order = await db_get_last_order(webhook_id, session, OrderType.SHORT_LIMIT, order_by='ask')
+
+    hedge_price = Decimal(short_order.price) * (1 - Decimal(payload.settings.offset_pluse) / 100)
 
     quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
 

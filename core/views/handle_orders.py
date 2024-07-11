@@ -73,6 +73,13 @@ async def get_webhook(webhook_id: str, session: AsyncSession) -> WebHook:
     return result.first()
 
 
+async def get_webhook_last(symbol: str, session: AsyncSession) -> WebHook:
+    query = select(WebHook).where(WebHook.symbol == symbol).order_by(WebHook.id.desc())
+    result = await session.exec(query)
+    return result.first()
+
+
+
 async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.LONG_MARKET):
     """
     Load all orders with status webhook, status Filled, Market type.
@@ -82,6 +89,26 @@ async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderT
         Order.status == OrderStatus.FILLED,
         Order.type == order_type
     ).order_by(Order.id.desc())
+
+    result = await session.exec(query)
+    return result.first()
+
+
+async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.LONG_MARKET, order_by='desc') -> Order:
+    """
+    Load all orders with status webhook, status Filled, Market type.
+    """
+
+    query = select(Order).where(
+        Order.webhook_id == webhook_id,
+        Order.status == OrderStatus.FILLED,
+        Order.type == order_type
+    )
+
+    if order_by == 'desc':
+        query = query.order_by(Order.id.desc())
+    else:
+        query = query.order_by(Order.id.asc())
 
     result = await session.exec(query)
     return result.first()
@@ -126,10 +153,16 @@ async def db_get_order_binance_id(
         order_binance_id,
         session: AsyncSession
 ) -> Order:
-    query = select(Order).options(joinedload(Order.webhook)).where(Order.binance_id == order_binance_id)
 
-    result = await session.exec(query)
-    return result.unique().one()
+    try:
+        query = select(Order).options(joinedload(Order.webhook)).where(Order.binance_id == order_binance_id)
+
+        result = await session.exec(query)
+        return result.unique().one()
+    except Exception as e:
+        print(f"no order in db {order_binance_id}")
+        logging.error(f"Error: {e}")
+        return None
 
 
 async def db_get_all_order(

@@ -94,14 +94,16 @@ async def create_order_binance(order: Order):
         'newClientOrderId': order.id,
     }
 
-    if order.type != OrderType.LONG_MARKET:
+    if order.type == OrderType.LONG_MARKET:
+        order_params["type"] = 'MARKET'
+    elif order.type in [OrderType.SHORT_LIMIT, OrderType.SHORT_STOP_LOSS]:
+        order_params["stopPrice"] = price
+        order_params["price"] = price
+        order_params["type"] = 'STOP'
+    else:
         order_params["price"] = price
         order_params["timeInForce"] = "GTC"
-        order_params["type"] = 'LIMIT' #todo: все ордера лимитные у нас, даже если это TP или Hadge
-
-    if order.type == OrderType.SHORT_LIMIT:
-        order_params["stopPrice"] = price
-        order_params["type"] = 'STOP_MARKET'
+        order_params["type"] = 'LIMIT'
 
     response = client.new_order(**order_params)
 

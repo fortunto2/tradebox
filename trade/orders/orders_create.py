@@ -66,6 +66,7 @@ async def create_long_market_order(
 
     pprint(market_order.model_dump())
     session.add(market_order)
+    await session.commit()
 
     return market_order
 
@@ -130,6 +131,7 @@ async def create_long_tp_order(
     pprint(take_proffit_order.model_dump())
 
     session.add(take_proffit_order)
+    await session.commit()
 
     return take_proffit_order
 
@@ -172,9 +174,9 @@ async def create_long_limit_order(
     pprint(limit_order.model_dump())
 
     session.add(limit_order)
+    await session.commit()
 
     return limit_order
-
 
 
 async def create_short_stop_order(
@@ -186,7 +188,7 @@ async def create_short_stop_order(
         session: AsyncSession
 ) -> Order:
     """
-    (SHORT-BUY-LIMIT_STOP) - ограничивающий стоп-ордер.
+    (SHORT-SELL) - ограничивающий стоп-ордер.
     Этот тип ордера используется для установки предела убытка, предотвращая дальнейшие потери.
     :param symbol: Тикер символа
     :param price: Цена, по которой будет активирован стоп-ордер
@@ -196,7 +198,7 @@ async def create_short_stop_order(
     :param session: Сессия базы данных
     :return: Созданный ордер
     """
-    print("Creating LIMIT STOP order:")
+    print("Creating SHORT STOP order:")
 
     # Создание объекта ордера
     limit_stop_order = Order(
@@ -217,6 +219,7 @@ async def create_short_stop_order(
 
     pprint(limit_stop_order.model_dump())
     session.add(limit_stop_order)
+    await session.commit()
 
     return limit_stop_order
 
@@ -229,7 +232,7 @@ async def create_short_stop_loss_order(
         session: AsyncSession
 ) -> Order:
     """
-    (SHORT-BUY-HEDGE_STOP_LIMIT) - сверху.
+    (SHORT-BUY) - сверху.
     Чтобы когда цена пойдет вверх, он закрыл позицию.
     Если пойдет еще выше цена, шорт будет в 2 раза будет больше чем лонговая.
     Нам надо скинуть эту позицию чтобы дальше шла вверх.
@@ -243,13 +246,15 @@ async def create_short_stop_loss_order(
     :param session:
     :return:
     """
-    print("SHORT-BUY-HEDGE_STOP_LIMIT:")
+    print("SHORT-BUY:")
 
     _, position_short = await check_position(symbol=symbol)
     position_short: ShortPosition
 
     price = Decimal(position_short.entryPrice) * (1 + Decimal(sl_short) / 100)
-    quantity = position_short.positionAmt
+    quantity = abs(position_short.positionAmt)
+    print('price:', price)
+    print('quantity:', quantity)
 
     order = Order(
         position_side=OrderPositionSide.SHORT,
@@ -267,6 +272,6 @@ async def create_short_stop_loss_order(
     order.status = OrderStatus.IN_PROGRESS
     pprint(order.model_dump())
     session.add(order)
+    await session.commit()
 
     return order
-

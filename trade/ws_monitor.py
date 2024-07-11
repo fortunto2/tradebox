@@ -16,15 +16,15 @@ from core.schemas.events.account_update import AccountUpdateEvent, UpdateData
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdateEvent, OrderTradeUpdate
 from core.schemas.webhook import WebhookPayload
-from core.views.handle_orders import db_get_order_binance_id
-from trade.orders.orders_create import create_short_stop_loss_order
+from core.views.handle_orders import db_get_order_binance_id, get_webhook, get_webhook_last
+from trade.orders.orders_create import create_short_stop_loss_order, create_short_stop_order, create_long_limit_order
 from trade.orders.orders_processing import grid_make_limit_and_tp_order, check_orders_in_the_grid, \
     open_short_position_loop
 
 
 class TradeMonitor:
-    def __init__(self, symbol):
-        self.symbol = symbol
+    def __init__(self, symbols):
+        self.symbols = symbols
 
         self.long_position_qty = Decimal(0)
         self.long_entry_price = Decimal(0)
@@ -39,19 +39,23 @@ class TradeMonitor:
         asyncio.set_event_loop(self.loop)
 
     async def monitor_events(self):
-        position_long, position_short = await check_position(self.symbol)
-        if position_long:
-            self.long_position_qty = position_long.positionAmt
-            self.long_entry_price = position_long.breakEvenPrice
-            print(f"+LONG -> qty: {self.long_position_qty}, Entry price: {self.long_entry_price}")
-
-        if position_short:
-            self.short_position_qty = position_short.positionAmt
-            self.short_entry_price = position_short.breakEvenPrice
-            print(f"-SHORT -> qty: {self.short_position_qty}, Entry price: {self.short_entry_price}")
 
         listen_key = client.new_listen_key().get('listenKey')
-        self.client.agg_trade(self.symbol)
+
+        for symbol in self.symbols:
+            position_long, position_short = await check_position(symbol)
+            if position_long:
+                self.long_position_qty = position_long.positionAmt
+                self.long_entry_price = position_long.breakEvenPrice
+                print(f"+LONG -> qty: {self.long_position_qty}, Entry price: {self.long_entry_price}")
+
+            if position_short:
+                self.short_position_qty = position_short.positionAmt
+                self.short_entry_price = position_short.breakEvenPrice
+                print(f"-SHORT -> qty: {self.short_position_qty}, Entry price: {self.short_entry_price}")
+
+            # self.client.agg_trade(symbol)
+
         self.client.user_data(listen_key=listen_key)
 
     def on_message(self, ws, msg):
@@ -114,13 +118,36 @@ class TradeMonitor:
                 order: Order = await db_get_order_binance_id(order_binance_id, session)
                 if not order:
                     print(f"!!!!!Order not found in DB - {order_binance_id}")
-                    return
+
+                    webhook = await get_webhook_last(event.symbol, session)
+
+                    # открывает шорт
+                    if event.side == 'SELL' and event.position_side == 'SHORT':
+                        order = await create_short_stop_order(
+                            symbol=event.symbol,
+                            price=Decimal(event.original_price),
+                            quantity=Decimal(event.original_quantity),
+                            leverage=webhook.open.leverage,
+                            webhook_id=webhook.id,
+                            session=session
+                        )
+                    # закрытие позиции
+                    elif event.side == 'BUY' and event.position_side == 'SHORT':
+                        order = await create_long_limit_order(
+                            symbol=event.symbol,
+                            price=Decimal(event.original_price),
+                            quantity=Decimal(event.original_quantity),
+                            leverage=webhook.open.leverage,
+                            webhook_id=webhook.id,
+                            session=session
+                        )
+                    else:
+                        return None
 
                 order.binance_id = order_binance_id
                 order.status = event.order_status
                 order.binance_status = event.order_status
                 await session.flush()
-
 
                 webhook = order.webhook
 
@@ -152,23 +179,22 @@ class TradeMonitor:
                         payload=payload,
                         session=session)
 
-                if order.type == OrderType.SHORT_STOP_LOSS and not orders_in_the_grid:
+                if order.type == OrderType.SHORT_STOP_LOSS:
                     print(f"Order {order_binance_id} HEDGE_STOP_LOSS start make_hedge_by_pnl")
 
                     # открытие позиции - виртуальный ордер
                     await open_short_position_loop(
                         payload=payload,
                         webhook_id=order.webhook_id,
+                        order_binance_id=order_binance_id,
                         session=session
                     )
 
-                if order.type == OrderType.SHORT_LIMIT and not orders_in_the_grid:
-                    # stop_price = Decimal(order.price) * (1 - Decimal(payload.settings.offset_short / 100))
+                if order.type == OrderType.SHORT_LIMIT:
 
                     short_stop_loss_order = await create_short_stop_loss_order(
                         symbol=payload.symbol,
                         sl_short=payload.settings.sl_short,
-                        # quantity=quantity,
                         leverage=payload.open.leverage,
                         webhook_id=order.webhook_id,
                         session=session
@@ -195,7 +221,7 @@ class TradeMonitor:
 
 async def main():
 
-    trade_monitor = TradeMonitor('JOEUSDT')
+    trade_monitor = TradeMonitor(['BNXUSDT', 'JOEUSDT'])
     await trade_monitor.monitor_events()
 
 
