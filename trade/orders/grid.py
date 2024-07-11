@@ -98,7 +98,7 @@ async def update_grid(
 ):
 
     order_market = await db_get_last_order(
-        webhook_id=webhook_id, session=session, order_type=OrderType.MARKET
+        webhook_id=webhook_id, session=session, order_type=OrderType.LONG_MARKET
     )
 
     if order_market is None:

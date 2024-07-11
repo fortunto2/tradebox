@@ -15,7 +15,7 @@ from core.binance_futures import create_order_binance, check_position, get_order
 from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide, OrderStatus, OrderBinanceStatus
 
 
-async def create_market_order(
+async def create_long_market_order(
         symbol: str,
         quantity: Decimal,
         leverage: int,
@@ -37,7 +37,7 @@ async def create_market_order(
     market_order = Order(
         position_side=OrderPositionSide.LONG,
         side=OrderSide.BUY,
-        type=OrderType.MARKET,
+        type=OrderType.LONG_MARKET,
 
         symbol=symbol,
         quantity=quantity,
@@ -70,7 +70,7 @@ async def create_market_order(
     return market_order
 
 
-async def create_tp_order(
+async def create_long_tp_order(
         symbol: str,
         tp: Decimal,
         leverage: int,
@@ -95,7 +95,7 @@ async def create_tp_order(
     print("Take proffit order:")
 
     # remove old tp orders
-    orders = await db_get_all_order(webhook_id, OrderStatus.IN_PROGRESS, OrderType.TAKE_PROFIT, session)
+    orders = await db_get_all_order(webhook_id, OrderStatus.IN_PROGRESS, OrderType.LONG_TAKE_PROFIT, session)
     for order in orders:
         try:
             result = await cancel_order_binance(symbol, order.binance_id)
@@ -114,7 +114,7 @@ async def create_tp_order(
     take_proffit_order = Order(
         position_side=OrderPositionSide.LONG,
         side=OrderSide.SELL,
-        type=OrderType.TAKE_PROFIT,
+        type=OrderType.LONG_TAKE_PROFIT,
 
         symbol=symbol,
         quantity=position_long.positionAmt,
@@ -134,7 +134,7 @@ async def create_tp_order(
     return take_proffit_order
 
 
-async def create_limit_order(
+async def create_long_limit_order(
         symbol: str,
         price: Decimal,
         quantity: Decimal,
@@ -158,7 +158,7 @@ async def create_limit_order(
     limit_order = Order(
         position_side=OrderPositionSide.LONG,
         side=OrderSide.BUY,
-        type=OrderType.LIMIT,
+        type=OrderType.LONG_LIMIT,
 
         symbol=symbol,
         price=price,
@@ -176,7 +176,8 @@ async def create_limit_order(
     return limit_order
 
 
-async def open_hedge_position(
+
+async def create_short_stop_order(
         symbol: str,
         price: Decimal,
         quantity: Decimal,
@@ -185,24 +186,23 @@ async def open_hedge_position(
         session: AsyncSession
 ) -> Order:
     """
-    (SHORT-SELL-HEDGE_LIMIT) - сверху.
-
-    Страховка, последний ордер который мы ставим как хеджирование.
-    Ради этого ордера все и задумано. Он открывает позицию
-    :param symbol:
-    :param price:
-    :param quantity:
-    :param leverage:
-    :param webhook_id:
-    :param session:
-    :return:
+    (SHORT-BUY-LIMIT_STOP) - ограничивающий стоп-ордер.
+    Этот тип ордера используется для установки предела убытка, предотвращая дальнейшие потери.
+    :param symbol: Тикер символа
+    :param price: Цена, по которой будет активирован стоп-ордер
+    :param quantity: Количество, которое нужно продать или купить
+    :param leverage: Плечо
+    :param webhook_id: Идентификатор вебхука
+    :param session: Сессия базы данных
+    :return: Созданный ордер
     """
-    print("SHORT-SELL-HEDGE_LIMIT:")
+    print("Creating LIMIT STOP order:")
 
-    short_order = Order(
+    # Создание объекта ордера
+    limit_stop_order = Order(
         position_side=OrderPositionSide.SHORT,
         side=OrderSide.SELL,
-        type=OrderType.HEDGE_LIMIT,
+        type=OrderType.SHORT_LIMIT,
 
         symbol=symbol,
         price=price,
@@ -211,18 +211,19 @@ async def open_hedge_position(
         webhook_id=webhook_id,
     )
 
-    short_order.binance_id = await create_order_binance(short_order)
-    short_order.status = OrderStatus.IN_PROGRESS
-    pprint(short_order.model_dump())
-    session.add(short_order)
+    # Отправка ордера на биржу и получение ID
+    limit_stop_order.binance_id = await create_order_binance(limit_stop_order)
+    limit_stop_order.status = OrderStatus.IN_PROGRESS
 
-    return short_order
+    pprint(limit_stop_order.model_dump())
+    session.add(limit_stop_order)
+
+    return limit_stop_order
 
 
-async def create_hedge_stop_loss_order(
+async def create_short_stop_loss_order(
         symbol: str,
         sl_short: float,
-        quantity: Decimal,
         leverage: int,
         webhook_id,
         session: AsyncSession
@@ -233,6 +234,7 @@ async def create_hedge_stop_loss_order(
     Если пойдет еще выше цена, шорт будет в 2 раза будет больше чем лонговая.
     Нам надо скинуть эту позицию чтобы дальше шла вверх.
 
+    :param price:
     :param symbol:
     :param sl_short: payload.settings.sl_short
     :param quantity:
@@ -247,11 +249,12 @@ async def create_hedge_stop_loss_order(
     position_short: ShortPosition
 
     price = Decimal(position_short.entryPrice) * (1 + Decimal(sl_short) / 100)
+    quantity = position_short.positionAmt
 
     order = Order(
         position_side=OrderPositionSide.SHORT,
         side=OrderSide.BUY,
-        type=OrderType.HEDGE_STOP_LOSS,
+        type=OrderType.SHORT_STOP_LOSS,
 
         symbol=symbol,
         price=price,
@@ -266,6 +269,4 @@ async def create_hedge_stop_loss_order(
     session.add(order)
 
     return order
-
-
 

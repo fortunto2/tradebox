@@ -17,7 +17,9 @@ from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdateEvent, OrderTradeUpdate
 from core.schemas.webhook import WebhookPayload
 from core.views.handle_orders import db_get_order_binance_id
-from trade.orders.orders_processing import grid_make_limit_and_tp_order, make_hedge_by_pnl, check_orders_in_the_grid
+from trade.orders.orders_create import create_short_stop_loss_order
+from trade.orders.orders_processing import grid_make_limit_and_tp_order, check_orders_in_the_grid, \
+    open_short_position_loop
 
 
 class TradeMonitor:
@@ -60,7 +62,7 @@ class TradeMonitor:
         asyncio.run(self.handle_message(msg))
 
     async def handle_message(self, msg):
-        # print(msg)
+        print(msg)
         message_dict = json.loads(msg)
         event_type = message_dict.get('e')
 
@@ -142,7 +144,7 @@ class TradeMonitor:
                     print(f"stop: filled_orders {filled_orders} >= grid_orders {grid_orders}")
                     orders_in_the_grid = False
 
-                if order.type == OrderType.LIMIT and orders_in_the_grid:
+                if order.type == OrderType.LONG_LIMIT and orders_in_the_grid:
                     print(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
 
                     await grid_make_limit_and_tp_order(
@@ -150,15 +152,29 @@ class TradeMonitor:
                         payload=payload,
                         session=session)
 
-                if order.type == OrderType.HEDGE_STOP_LOSS and not orders_in_the_grid:
+                if order.type == OrderType.SHORT_STOP_LOSS and not orders_in_the_grid:
                     print(f"Order {order_binance_id} HEDGE_STOP_LOSS start make_hedge_by_pnl")
 
-                    await make_hedge_by_pnl(
-                        payload=payload, #todo: check
+                    # открытие позиции - виртуальный ордер
+                    await open_short_position_loop(
+                        payload=payload,
                         webhook_id=order.webhook_id,
-                        hedge_stop_loss_order_binance_id=order_binance_id,
                         session=session
                     )
+
+                if order.type == OrderType.SHORT_LIMIT and not orders_in_the_grid:
+                    # stop_price = Decimal(order.price) * (1 - Decimal(payload.settings.offset_short / 100))
+
+                    short_stop_loss_order = await create_short_stop_loss_order(
+                        symbol=payload.symbol,
+                        sl_short=payload.settings.sl_short,
+                        # quantity=quantity,
+                        leverage=payload.open.leverage,
+                        webhook_id=order.webhook_id,
+                        session=session
+                    )
+
+                    print(f"Create short_stop_loss_order: {short_stop_loss_order.id}")
 
                 await session.commit()
 

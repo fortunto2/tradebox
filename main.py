@@ -6,7 +6,7 @@ from sqlmodel import SQLModel
 
 from core.binance_futures import check_position_side_dual, check_position
 from core.schemas.position import LongPosition
-from trade.orders.orders_processing import create_first_orders
+from trade.orders.orders_processing import open_long_position
 from core.models.webhook import WebHook
 from core.schemas.webhook import WebhookPayload
 from core.tg_client import TelegramClient
@@ -66,7 +66,7 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     # current_price = get_current_price(symbol)
     # logging.info(f"Current price for {symbol}: {current_price}")
 
-    await create_first_orders(body, webhook.id, session)
+    await open_long_position(body, webhook.id, session)
     # tg.send_message(message=first_order.model_dump_json())
 
     return {"status": "success"}

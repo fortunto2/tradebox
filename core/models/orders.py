@@ -46,31 +46,12 @@ class OrderType(enum.Enum):
     TRAILING_STOP_MARKET	quantity,callbackRate
     """
 
-    LIMIT = "LIMIT"
-    MARKET = "MARKET"
-    TAKE_PROFIT = "TAKE_PROFIT"
+    LONG_LIMIT = "LONG_LIMIT"
+    LONG_MARKET = "LONG_MARKET"
+    LONG_TAKE_PROFIT = "LONG_TAKE_PROFIT"
     # our custom
-    HEDGE_LIMIT = "HEDGE_LIMIT"
-    HEDGE_STOP_LOSS = "HEDGE_STOP_LOSS"
-
-
-
-class OrderType(enum.Enum):
-    """
-    Type	Additional mandatory parameters
-    LIMIT	timeInForce, quantity, price
-    MARKET	quantity
-    STOP/TAKE_PROFIT	quantity, price, stopPrice
-    STOP_MARKET/TAKE_PROFIT_MARKET	stopPrice
-    TRAILING_STOP_MARKET	quantity,callbackRate
-    """
-
-    LIMIT = "LIMIT"
-    MARKET = "MARKET"
-    TAKE_PROFIT = "TAKE_PROFIT"
-    # our custom
-    HEDGE_LIMIT = "HEDGE_LIMIT"
-    HEDGE_STOP_LOSS = "HEDGE_STOP_LOSS"
+    SHORT_LIMIT = "SHORT_LIMIT"
+    SHORT_STOP_LOSS = "SHORT_STOP_LOSS"
 
 
 class Order(BaseTable, table=True):

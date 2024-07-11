@@ -12,13 +12,13 @@ from core.schemas.position import ShortPosition
 from core.schemas.webhook import WebhookPayload
 from core.views.handle_orders import db_get_last_order, db_get_orders, get_webhook
 from trade.orders.grid import update_grid
-from trade.orders.orders_create import create_market_order, open_hedge_position, create_hedge_stop_loss_order, \
-    create_tp_order, create_limit_order
+from trade.orders.orders_create import create_long_market_order,  \
+    create_long_tp_order, create_long_limit_order, create_short_stop_order
 
 
-async def create_first_orders(payload: WebhookPayload, webhook_id, session: AsyncSession):
+async def open_long_position(payload: WebhookPayload, webhook_id, session: AsyncSession):
     # todo check in db first
-    first_order = await create_market_order(
+    first_order = await create_long_market_order(
         symbol=payload.symbol,
         quantity=payload.open.amount,
         leverage=payload.open.leverage,
@@ -38,40 +38,37 @@ async def create_first_orders(payload: WebhookPayload, webhook_id, session: Asyn
     return
 
 
-async def make_hedge_by_pnl(
+async def open_short_position_loop(
         payload: WebhookPayload,
         webhook_id,
         session: AsyncSession,
-        hedge_stop_loss_order_binance_id: int = None,
+        order_binance_id: int,
         quantity: Decimal = None,
         hedge_price: Decimal = None,
 ):
     extramarg = Decimal(payload.settings.extramarg)
 
-    if hedge_stop_loss_order_binance_id:
-        # quantity - в цикле уменьшеается, вычитаем убытки
+    # quantity - в цикле уменьшеается, вычитаем убытки
 
-        pnl = get_position_closed_pnl(payload.symbol, int(hedge_stop_loss_order_binance_id))
-        print("pnl:", pnl)
+    pnl = get_position_closed_pnl(payload.symbol, int(order_binance_id))
+    print("pnl:", pnl)
 
-        extramarg = Decimal(payload.settings.extramarg) - pnl
+    extramarg = Decimal(payload.settings.extramarg) - pnl
 
-        if extramarg * Decimal(payload.open.leverage) < 11:
-            #  проверку что не extramarg не должен быть менее 11 долларов * плече
-            print("Not enough money")
-            return
+    if extramarg * Decimal(payload.open.leverage) < 11:
+        #  проверку что не extramarg не должен быть менее 11 долларов * плече
+        print("Not enough money")
+        return
 
-    if not hedge_price:
-        _, position_short = await check_position(symbol=payload.symbol)
-        position_short: ShortPosition
+    _, position_short = await check_position(symbol=payload.symbol)
+    position_short: ShortPosition
 
-        hedge_price = Decimal(position_short.entryPrice) * (1 - Decimal(payload.settings.offset_pluse) / 100)
+    hedge_price = Decimal(position_short.entryPrice) * (1 - Decimal(payload.settings.offset_pluse) / 100)
 
-    if not quantity:
-        quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
+    quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
 
     # только один раз, когда хватает денег
-    hedge_order = await open_hedge_position(
+    hedge_stop_order = await create_short_stop_order(
         symbol=payload.symbol,
         price=hedge_price,
         quantity=quantity,
@@ -80,16 +77,8 @@ async def make_hedge_by_pnl(
         session=session,
     )
 
-    hedge_stop_loss_order = await create_hedge_stop_loss_order(
-        symbol=payload.symbol,
-        sl_short=payload.settings.sl_short,
-        leverage=payload.open.leverage,
-        webhook_id=webhook_id,
-        session=session,
-        quantity=quantity
-    )
+    return hedge_stop_order.binance_id
 
-    return hedge_stop_loss_order.binance_id
 
 
 #
@@ -140,7 +129,7 @@ async def get_grid_orders(
             webhook_id=webhook_id,
             order_status=status,
             position_side=OrderPositionSide.LONG,
-            order_type=OrderType.LIMIT,
+            order_type=OrderType.LONG_LIMIT,
             order_side=OrderSide.BUY,
             session=session
         )
@@ -148,7 +137,7 @@ async def get_grid_orders(
         orders = await db_get_orders(
             order_status=status,
             position_side=OrderPositionSide.LONG,
-            order_type=OrderType.LIMIT,
+            order_type=OrderType.LONG_LIMIT,
             order_side=OrderSide.BUY,
             session=session
         )
@@ -219,7 +208,7 @@ async def grid_make_limit_and_tp_order(
 
     price, quantity = grid[len(filled_orders)]
 
-    tp_order = await create_tp_order(
+    tp_order = await create_long_tp_order(
         symbol=payload.symbol,
         tp=payload.settings.tp,
         leverage=payload.open.leverage,
@@ -227,7 +216,7 @@ async def grid_make_limit_and_tp_order(
         session=session,
     )
 
-    limit_order = await create_limit_order(
+    limit_order = await create_long_limit_order(
         symbol=payload.symbol,
         price=price,
         quantity=quantity,
@@ -243,12 +232,13 @@ async def grid_make_limit_and_tp_order(
         short_order_price = Decimal(price) * Decimal(1 - payload.settings.offset_short / 100)
         short_order_amount = Decimal(payload.settings.extramarg * payload.open.leverage) / short_order_price
 
-        await make_hedge_by_pnl(
-            payload=payload,
+        await create_short_stop_order(
+            symbol=payload.symbol,
+            price=short_order_price,
+            quantity=short_order_amount,
+            leverage=payload.open.leverage,
             webhook_id=webhook_id,
             session=session,
-            quantity=short_order_amount,
-            hedge_price=short_order_price
         )
 
     await session.commit()

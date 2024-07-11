@@ -73,7 +73,7 @@ async def get_webhook(webhook_id: str, session: AsyncSession) -> WebHook:
     return result.first()
 
 
-async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.MARKET):
+async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.LONG_MARKET):
     """
     Load all orders with status webhook, status Filled, Market type.
     """
