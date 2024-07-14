@@ -81,12 +81,17 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
         print(f"Position found for symbol: {body.symbol}. Ignoring new webhook.")
         return {"status": "ignored", "reason": f"position found for {body.symbol}"}
 
+    symbol = body.symbol
+    # if last characher in symbol P, remove it
+    if symbol[-1] == '.P':
+        symbol = symbol[:-1]
+
     # save webhook to db
     webhook = WebHook(
         name=body.name,
         side=body.side.value,
         positionSide=body.positionSide.value,
-        symbol=body.symbol,
+        symbol=symbol,
         open=body.open,
         settings=body.settings
     )
