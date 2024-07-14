@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
 from core.binance_futures import check_position_side_dual, check_position
+from core.models.orders import Order
 from core.schemas.position import LongPosition
 from trade.orders.orders_processing import open_long_position
 from core.models.webhook import WebHook
@@ -16,13 +17,47 @@ logging.basicConfig(level=logging.INFO)
 
 from core.db_async import async_engine, get_async_session
 
-
 import logging
 
 from starlette.responses import JSONResponse
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
+
+from sqladmin import Admin, ModelView
+
+admin = Admin(app, async_engine, base_url="/rust_admin")
+
+
+class WebhooksAdmin(ModelView, model=WebHook):
+    can_create = True
+    can_edit = False
+    can_delete = False
+    column_list = [WebHook.id, WebHook.symbol]
+    # column_searchable_list = [WebHook.symbol]
+    # column_sortable_list = [WebHook.id]
+    # column_formatters = {WebHook.symbol: lambda m, a: m.symbol[:10]}
+    # column_default_sort = [(WebHook.id, True), (WebHook.symbol, False)]
+
+
+admin.add_view(WebhooksAdmin)
+
+
+class OrdersAdmin(ModelView, model=Order):
+    can_create = False
+    can_edit = False
+    can_delete = False
+    column_list = [Order.id, Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status, Order.type]
+    column_searchable_list = [Order.symbol, Order.webhook_id]
+    column_sortable_list = [Order.id, Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status,
+                            Order.type]
+    column_formatters = {Order.symbol: lambda m, a: m.symbol[:10]}
+    column_default_sort = [(Order.id, True), (Order.symbol, False)]
+    column_filters = [Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status]
+
+
+# admin.add_view(WebhooksAdmin)
+admin.add_view(OrdersAdmin)
 
 
 @app.exception_handler(RequestValidationError)
