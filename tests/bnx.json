@@ -2,7 +2,7 @@
   "name": "APIKEY",
   "side": "buy",
   "positionSide": "long",
-  "symbol": "BNXUSDT",
+  "symbol": "BNXUSDT.P",
   "open": {
     "enabled": true,
     "amountType": "amount",

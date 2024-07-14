@@ -67,24 +67,18 @@ async def on_startup():
 async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(get_async_session)):
     logging.info(f"Received webhook JSON payload: {body.json()}")
 
-    # firstly check existing orders
-    # open_orders = await check_open_orders(symbol)
-    # if open_orders:
-    #     logging.info(f"Open orders found for symbol: {symbol}. Ignoring new webhook.")
-    #     return {"status": "ignored", "reason": "open orders found"}
+    symbol = body.symbol
+    # if last characher in symbol P, remove it
+    if symbol[-2:] == '.P':
+        symbol = symbol[:-2]
 
-    position_long, _ = await check_position(symbol=body.symbol)
+    position_long, _ = await check_position(symbol=symbol)
     position_long: LongPosition
 
     if float(position_long.entryPrice) > 0:
         print(position_long)
         print(f"Position found for symbol: {body.symbol}. Ignoring new webhook.")
         return {"status": "ignored", "reason": f"position found for {body.symbol}"}
-
-    symbol = body.symbol
-    # if last characher in symbol P, remove it
-    if symbol[-1] == '.P':
-        symbol = symbol[:-1]
 
     # save webhook to db
     webhook = WebHook(

@@ -2,7 +2,7 @@
   "name": "APIKEY",
   "side": "buy",
   "positionSide": "long",
-  "symbol": "UNFIUSDT",
+  "symbol": "UNFIUSDT.P",
   "open": {
     "enabled": true,
     "amountType": "amount",
