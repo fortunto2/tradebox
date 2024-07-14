@@ -25,7 +25,8 @@ async_engine = create_async_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     future=True,
-    json_serializer=pydantic_serializer
+    json_serializer=pydantic_serializer,
+    connect_args={'timeout': 15}
 )
 
 async_session = sessionmaker(bind=async_engine, class_=AsyncSession, expire_on_commit=False)

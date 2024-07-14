@@ -98,7 +98,7 @@ class TradeMonitor:
             self.short_pnl = round((trade_price - self.short_entry_price) * self.short_position_qty, 2)
             print(f"-Short PNL: {self.short_pnl}")
 
-            _diff = round(self.long_pnl + self.short_pnl - Decimal(0.01),2)
+            _diff = round(self.long_pnl + self.short_pnl - Decimal(0.01), 2)
             if _diff > 0:
                 print(f"=Profit: {_diff} USDT")
                 # close all positions, orders all
@@ -235,7 +235,6 @@ class TradeMonitor:
 
                 # первый. ставиться снизу
                 if order.type == OrderType.SHORT_LIMIT:
-
                     short_stop_loss_order = await create_short_stop_loss_order(
                         symbol=payload.symbol,
                         sl_short=payload.settings.sl_short,
@@ -264,41 +263,44 @@ class TradeMonitor:
 
 
 async def check_orders(symbols, session):
-
-        for symbol in symbols:
-        #check postitions
-            position_long, position_short = await check_position(symbol)
+    for symbol in symbols:
+        # check postitions
+        position_long, position_short = await check_position(symbol)
         #     if no postition set all orders in db status Canceled
-            if not (position_long.positionAmt and position_short.positionAmt):
-                print(f"no position in {symbol}")
-                query = select(Order).where(Order.status == OrderStatus.IN_PROGRESS)
-                result = await session.exec(query)
-                for order in result.all():
-                    order.status = OrderStatus.CANCELED
+        if not (position_long.positionAmt and position_short.positionAmt):
+            print(f"no position in {symbol}")
+            query = select(Order).where(Order.status == OrderStatus.IN_PROGRESS)
+            result = await session.exec(query)
+            for order in result.all():
+                order.status = OrderStatus.CANCELED
 
-                await session.commit()
+            await session.commit()
 
-                cancel_open_orders(symbol)
+            cancel_open_orders(symbol)
 
-async def main():
 
-    # load all symbols from db
+import click
+
+
+@click.command()
+@click.option("--symbol", prompt="Symbol", default="UNFIUSDT", show_default=True,
+              help="Enter the trading symbol (default: USD)")
+def main(symbol):
+    asyncio.run(async_main(symbol))
+
+
+async def async_main(symbol):
+    # Assume async_engine and necessary imports are defined elsewhere
     async with AsyncSession(async_engine) as session:
-        symbols = await get_all_symbols(session)
-        print('START MONITORING: ')
-        print(symbols)
+        # symbols = await get_all_symbols(session)
+        # print('START MONITORING: ')
+        # print(symbols)
 
-        # if symbols:
-        #     await check_orders(symbols, session)
-        #     trade_monitor = TradeMonitor(symbols)
-        # else:
-
-        symbols = ['UNFIUSDT']
-        await check_orders(symbols, session)
-        trade_monitor = TradeMonitor(symbols)
+        await check_orders([symbol], session)
+        trade_monitor = TradeMonitor([symbol])
 
         await trade_monitor.monitor_events()
 
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
