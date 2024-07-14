@@ -17,7 +17,7 @@ class OpenOrder(BaseModel):
 
 class Settings(BaseModel):
     deposit: float
-    time_allert: datetime
+    time_allert: Optional[datetime] = None
     extramarg: float
     tp: Decimal
     trail_1: float
@@ -30,7 +30,7 @@ class Settings(BaseModel):
     trail_step: float
     order_quan: int
     sens: Optional[int]
-    time_frame: Optional[str]
+    time_frame: Optional[str] = None
 
     @field_validator('grid_long', 'mg_long', mode='before')
     def split_string_to_list(cls, v):
