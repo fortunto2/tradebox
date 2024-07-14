@@ -72,13 +72,15 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     if symbol[-2:] == '.P':
         symbol = symbol[:-2]
 
+    body.symbol = symbol
+
     position_long, _ = await check_position(symbol=symbol)
     position_long: LongPosition
 
     if float(position_long.entryPrice) > 0:
         print(position_long)
-        print(f"Position found for symbol: {body.symbol}. Ignoring new webhook.")
-        return {"status": "ignored", "reason": f"position found for {body.symbol}"}
+        print(f"Position found for symbol: {symbol}. Ignoring new webhook.")
+        return {"status": "ignored", "reason": f"position found for {symbol}"}
 
     # save webhook to db
     webhook = WebHook(
