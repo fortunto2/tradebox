@@ -276,7 +276,7 @@ async def check_orders(symbols, session):
 
             await session.commit()
 
-            cancel_open_orders(symbol)
+            # cancel_open_orders(symbol)
 
 
 import click
