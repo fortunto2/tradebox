@@ -7,6 +7,7 @@ import asyncio
 from decimal import Decimal
 
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from core.binance_futures import client, check_position, cancel_open_orders, cancel_open_orders_manual
@@ -16,7 +17,7 @@ from core.schemas.events.account_update import AccountUpdateEvent, UpdateData
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdateEvent, OrderTradeUpdate
 from core.schemas.webhook import WebhookPayload
-from core.views.handle_orders import db_get_order_binance_id, get_webhook, get_webhook_last
+from core.views.handle_orders import db_get_order_binance_id, get_webhook, get_webhook_last, get_all_symbols
 from trade.orders.orders_create import create_short_stop_loss_order, create_short_stop_order, create_long_limit_order, \
     create_long_tp_order, create_short_market_order, create_long_market_order
 from trade.orders.orders_processing import grid_make_long_limit_order, check_orders_in_the_grid, \
@@ -178,7 +179,7 @@ class TradeMonitor:
                         return None
 
                 order.binance_id = order_binance_id
-                order.status = event.order_status
+                order.status = OrderStatus.FILLED
                 order.binance_status = event.order_status
                 await session.flush()
 
@@ -262,10 +263,41 @@ class TradeMonitor:
                 pprint(position)
 
 
+async def check_orders(symbols, session):
+
+        for symbol in symbols:
+        #check postitions
+            position_long, position_short = await check_position(symbol)
+        #     if no postition set all orders in db status Canceled
+            if not (position_long.positionAmt and position_short.positionAmt):
+                print(f"no position in {symbol}")
+                query = select(Order).where(Order.status == OrderStatus.IN_PROGRESS)
+                result = await session.exec(query)
+                for order in result.all():
+                    order.status = OrderStatus.CANCELED
+
+                await session.commit()
+
+                cancel_open_orders(symbol)
+
 async def main():
 
-    trade_monitor = TradeMonitor(['BNXUSDT'])
-    await trade_monitor.monitor_events()
+    # load all symbols from db
+    async with AsyncSession(async_engine) as session:
+        symbols = await get_all_symbols(session)
+        print('START MONITORING: ')
+        print(symbols)
+
+        # if symbols:
+        #     await check_orders(symbols, session)
+        #     trade_monitor = TradeMonitor(symbols)
+        # else:
+
+        symbols = ['UNFIUSDT']
+        await check_orders(symbols, session)
+        trade_monitor = TradeMonitor(symbols)
+
+        await trade_monitor.monitor_events()
 
 
 if __name__ == '__main__':

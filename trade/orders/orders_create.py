@@ -261,7 +261,7 @@ async def create_short_stop_order(
     print("Creating SHORT STOP order:")
 
     # Создание объекта ордера
-    limit_stop_order = Order(
+    order = Order(
         position_side=OrderPositionSide.SHORT,
         side=OrderSide.SELL,
         type=OrderType.SHORT_LIMIT,
@@ -273,15 +273,25 @@ async def create_short_stop_order(
         webhook_id=webhook_id,
     )
 
-    # Отправка ордера на биржу и получение ID
-    limit_stop_order.binance_id = await create_order_binance(limit_stop_order)
-    limit_stop_order.status = OrderStatus.IN_PROGRESS
+    order_binance = None
 
-    pprint(limit_stop_order.model_dump())
-    session.add(limit_stop_order)
+    while not order_binance:
+
+        order.binance_id = await create_order_binance(order)
+        order.status = OrderStatus.IN_PROGRESS
+        pprint(order.model_dump())
+
+        order_binance = await get_order_id(symbol, order.binance_id)
+        order.binance_status = order_binance['status']
+
+        if not order_binance:
+            print('!!!!Order not found, retrying')
+            await asyncio.sleep(5)
+
+    session.add(order)
     await session.commit()
 
-    return limit_stop_order
+    return order
 
 
 async def create_short_stop_loss_order(
@@ -328,9 +338,22 @@ async def create_short_stop_loss_order(
         webhook_id=webhook_id,
     )
 
-    order.binance_id = await create_order_binance(order)
-    order.status = OrderStatus.IN_PROGRESS
-    pprint(order.model_dump())
+    # while not Filled
+    order_binance = None
+
+    while not order_binance:
+
+        order.binance_id = await create_order_binance(order)
+        order.status = OrderStatus.IN_PROGRESS
+        pprint(order.model_dump())
+
+        order_binance = await get_order_id(symbol, order.binance_id)
+        order.binance_status = order_binance['status']
+
+        if not order_binance:
+            print('!!!!Order not found, retrying')
+            await asyncio.sleep(5)
+
     session.add(order)
     await session.commit()
 

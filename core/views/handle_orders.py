@@ -79,6 +79,16 @@ async def get_webhook_last(symbol: str, session: AsyncSession) -> WebHook:
     return result.first()
 
 
+async def get_all_symbols(session: AsyncSession, status=None) -> list:
+    # all orders in select in_progress nad group by symbols
+    if status is None:
+        query = select(Order).group_by(Order.symbol)
+    else:
+        query = select(Order).where(Order.status == status).group_by(Order.symbol)
+    result = await session.exec(query)
+    list_symbols = [order.symbol for order in result.all()]
+    return list_symbols
+
 
 async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.LONG_MARKET):
     """
@@ -94,7 +104,8 @@ async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderT
     return result.first()
 
 
-async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.LONG_MARKET, order_by='desc') -> Order:
+async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.LONG_MARKET,
+                            order_by='desc') -> Order:
     """
     Load all orders with status webhook, status Filled, Market type.
     """
@@ -153,7 +164,6 @@ async def db_get_order_binance_id(
         order_binance_id,
         session: AsyncSession
 ) -> Order:
-
     try:
         query = select(Order).options(joinedload(Order.webhook)).where(Order.binance_id == order_binance_id)
 
@@ -198,7 +208,6 @@ async def get_next_order(session: AsyncSession, symbol: str):
 
 
 async def main():
-
     async with AsyncSession(async_engine) as session:
         order = await db_get_order_binance_id(1594495326, session)
         webhook = order.webhook
@@ -216,7 +225,6 @@ async def main():
 
 
 if __name__ == "__main__":
-
     import asyncio
 
     asyncio.run(main())

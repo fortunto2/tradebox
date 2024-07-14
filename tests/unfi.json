@@ -2,11 +2,11 @@
   "name": "APIKEY",
   "side": "buy",
   "positionSide": "long",
-  "symbol": "BNXUSDT",
+  "symbol": "UNFIUSDT",
   "open": {
     "enabled": true,
     "amountType": "amount",
-    "amount": "10",
+    "amount": "2.5",
     "leverage": "25"
   },
   "settings": {
@@ -16,7 +16,7 @@
     "trail_1": "0.3",
     "trail_2": "0.1",
     "trail_step": "0.1",
-    "offset_short": "0.1",
+    "offset_short": "0",
     "offset_pluse": "0.1",
     "sl_short": "0.2",
     "grid_long": "0.05",

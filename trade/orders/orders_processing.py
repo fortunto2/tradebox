@@ -1,3 +1,4 @@
+import time
 from decimal import Decimal
 from typing import List
 
@@ -228,6 +229,8 @@ async def grid_make_long_limit_order(
 
         short_order_price = Decimal(price) * Decimal(1 - payload.settings.offset_short / 100)
         short_order_amount = Decimal(payload.settings.extramarg * payload.open.leverage) / short_order_price
+
+        time.sleep(0.5)
 
         await create_short_stop_order(
             symbol=payload.symbol,

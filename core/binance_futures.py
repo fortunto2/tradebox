@@ -277,11 +277,6 @@ def cancel_open_orders(symbol: str) -> dict:
     print(f">>> Cancel all open orders: {status}")
     return status
 
-def positions_close(symbol: str) -> dict:
-    status = client.cancel_open_orders(symbol=symbol)
-    print(f">>> Cancel all open orders: {status}")
-    return status
-
 
 def cancel_open_orders_manual(symbol: str, order_id) -> dict:
     # Получение всех активных ордеров
