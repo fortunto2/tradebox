@@ -4,6 +4,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import SQLModel
 
+from api.api_exceptions import *
 from core.binance_futures import check_position_side_dual, check_position
 from core.schemas.position import LongPosition
 from trade.orders.orders_processing import open_long_position
