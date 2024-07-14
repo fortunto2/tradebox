@@ -28,8 +28,16 @@ async def open_long_position(payload: WebhookPayload, webhook_id, session: Async
 
     await session.commit()
 
+    tp_order = await create_long_tp_order(
+        symbol=payload.symbol,
+        tp=payload.settings.tp,
+        leverage=payload.open.leverage,
+        webhook_id=webhook_id,
+        session=session,
+    )
+
     # первый запуск создание пары ордеров лимитных по сетки
-    await grid_make_limit_and_tp_order(
+    await grid_make_long_limit_order(
         webhook_id=webhook_id,
         payload=payload,
         session=session
@@ -184,7 +192,7 @@ async def check_orders_in_the_grid(payload: WebhookPayload, webhook_id, session:
     return filled_orders, grid_orders, grid
 
 
-async def grid_make_limit_and_tp_order(
+async def grid_make_long_limit_order(
         webhook_id,
         payload: WebhookPayload,
         session: AsyncSession = None):
@@ -200,21 +208,10 @@ async def grid_make_limit_and_tp_order(
         print("payload not found, webhook_id:", webhook_id)
         return False
 
+
     filled_orders, grid_orders, grid = await check_orders_in_the_grid(payload, webhook_id, session)
-    if len(filled_orders) >= len(grid):
-        # когда последний заканчивет сетку
-        print(f"stop: filled_orders {filled_orders} >= grid_orders {grid_orders}")
-        return False
 
     price, quantity = grid[len(filled_orders)]
-
-    tp_order = await create_long_tp_order(
-        symbol=payload.symbol,
-        tp=payload.settings.tp,
-        leverage=payload.open.leverage,
-        webhook_id=webhook_id,
-        session=session,
-    )
 
     limit_order = await create_long_limit_order(
         symbol=payload.symbol,

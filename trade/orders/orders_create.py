@@ -20,11 +20,13 @@ async def create_long_market_order(
         quantity: Decimal,
         leverage: int,
         webhook_id,
-        session: AsyncSession
+        side: OrderSide = OrderSide.BUY,
+        session: AsyncSession = None,
 ) -> Order:
     """
     (LONG-BUY-MARKET) - стартовый лонг.
     Создание маркет ордера в самом начале когда пришел вебхук и открыли позицию
+    :param side:
     :param symbol:
     :param quantity:
     :param leverage:
@@ -32,11 +34,11 @@ async def create_long_market_order(
     :param session:
     :return:
     """
-    print("Market order:")
+    print("Market order LONG:")
 
     market_order = Order(
         position_side=OrderPositionSide.LONG,
-        side=OrderSide.BUY,
+        side=side,
         type=OrderType.LONG_MARKET,
 
         symbol=symbol,
@@ -69,6 +71,64 @@ async def create_long_market_order(
     await session.commit()
 
     return market_order
+
+
+async def create_short_market_order(
+        symbol: str,
+        quantity: Decimal,
+        leverage: int,
+        webhook_id,
+        side: OrderSide = OrderSide.BUY,
+        session: AsyncSession = None
+) -> Order:
+    """
+    (SHORT-BUY-MARKET) - вконце для закрытия
+    :param side:
+    :param symbol:
+    :param quantity:
+    :param leverage:
+    :param webhook_id:
+    :param session:
+    :return:
+    """
+    print("Market order SHORT:")
+
+    market_order = Order(
+        position_side=OrderPositionSide.SHORT,
+        side=side,
+        type=OrderType.SHORT_MARKET,
+
+        symbol=symbol,
+        quantity=quantity,
+        leverage=leverage,
+        webhook_id=webhook_id,
+        order_number=0
+    )
+
+    order_binance_id = await create_order_binance(market_order)
+    market_order.binance_id = order_binance_id
+
+    _, position_short = await check_position(symbol=symbol)
+    position_short: ShortPosition
+
+    if position_short:
+        market_order.price = position_short.entryPrice
+        market_order.status = OrderStatus.FILLED
+
+    # while not Filled
+    order = {'status': 'NEW'}
+
+    while order['status'] != 'FILLED':
+        order = await get_order_id(symbol, order_binance_id)
+        await asyncio.sleep(1)
+        market_order.binance_status = OrderBinanceStatus.FILLED
+
+    pprint(market_order.model_dump())
+    session.add(market_order)
+    await session.commit()
+
+    return market_order
+
 
 
 async def create_long_tp_order(

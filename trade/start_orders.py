@@ -13,8 +13,7 @@ sys.path.append('../core')
 from core.db_async import async_engine
 
 from core.schemas.webhook import WebhookPayload
-from trade.orders.orders_create import create_long_tp_order, create_long_limit_order
-from trade.orders.orders_processing import open_long_position, make_hedge_by_pnl
+from trade.orders.orders_processing import open_long_position
 
 
 async def main(payload: WebhookPayload):

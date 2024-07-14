@@ -94,7 +94,7 @@ async def create_order_binance(order: Order):
         'newClientOrderId': order.id,
     }
 
-    if order.type == OrderType.LONG_MARKET:
+    if order.type == OrderType.LONG_MARKET or order.type == OrderType.SHORT_MARKET:
         order_params["type"] = 'MARKET'
     elif order.type in [OrderType.SHORT_LIMIT, OrderType.SHORT_STOP_LOSS]:
         order_params["stopPrice"] = price
@@ -272,8 +272,33 @@ def get_current_price(symbol: str) -> Decimal:
         raise HTTPException(status_code=500, detail="Failed to get current price")
 
 
+def cancel_open_orders(symbol: str) -> dict:
+    status = client.cancel_open_orders(symbol=symbol)
+    print(f">>> Cancel all open orders: {status}")
+    return status
+
+def positions_close(symbol: str) -> dict:
+    status = client.cancel_open_orders(symbol=symbol)
+    print(f">>> Cancel all open orders: {status}")
+    return status
+
+
+def cancel_open_orders_manual(symbol: str, order_id) -> dict:
+    # Получение всех активных ордеров
+    orders = client.get_open_orders(symbol=symbol)
+    for order in orders:
+        try:
+            # Отмена каждого ордера
+            result = client.cancel_order(symbol=symbol, orderId=order['orderId'])
+            print(f"Cancelled order ID: {order['orderId']}")
+        except Exception as e:
+            print(f"An error occurred while canceling the order {order['orderId']}: {e}")
+
+
+
+
 def get_position_closed_pnl(symbol: str, order_id: int) -> Decimal:
-    orders = client.get_account_trades(symbol, orderId=order_id)
+    orders = client.get_account_trades(symbol=symbol, orderId=order_id)
     return Decimal(orders[0].get('realizedPnl'))
 
 

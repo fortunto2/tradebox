@@ -48,6 +48,7 @@ class OrderType(enum.Enum):
 
     LONG_LIMIT = "LONG_LIMIT"
     LONG_MARKET = "LONG_MARKET"
+    SHORT_MARKET = "SHORT_MARKET"
     LONG_TAKE_PROFIT = "LONG_TAKE_PROFIT"
     # our custom
     SHORT_LIMIT = "SHORT_LIMIT"
