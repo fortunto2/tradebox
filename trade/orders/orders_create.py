@@ -66,14 +66,15 @@ async def create_long_market_order(
         order = {'status': 'NEW'}
         timer = 0
 
-        while order['status'] != 'FILLED' or timer < 30:
-            try:
-                order = await get_order_id(symbol, order_binance_id)
-            except Exception as e:
-                timer += 1
-                print(e)
-                await asyncio.sleep(1)
-            market_order.binance_status = OrderBinanceStatus.FILLED
+        # while order['status'] != 'FILLED' or timer < 30:
+        #     try:
+        #         order = await get_order_id(symbol, order_binance_id)
+        #     except Exception as e:
+        #         timer += 1
+        #         print(e)
+        #         await asyncio.sleep(1)
+
+        market_order.binance_status = OrderBinanceStatus.FILLED
 
         pprint(market_order.model_dump())
         async with AsyncSession(async_engine) as session:
@@ -129,7 +130,7 @@ async def create_short_market_order(
     order = {'status': 'NEW'}
     timer = 0
 
-    while order['status'] != 'FILLED' and timer < 30:
+    while order['status'] != 'FILLED' or timer < 30:
         try:
             order = await get_order_id(symbol, order_binance_id)
         except Exception as e:
@@ -295,7 +296,7 @@ async def create_short_stop_order(
     order_binance = None
     timer = 0
 
-    while not order_binance and timer < 10:
+    while not order_binance or timer < 10:
 
         order.binance_id = await create_order_binance(order)
         order.status = OrderStatus.IN_PROGRESS
@@ -367,7 +368,7 @@ async def create_short_stop_loss_order(
     order_binance = None
     timer = 0
 
-    while not order_binance and timer < 10:
+    while not order_binance or timer < 10:
 
         order.binance_id = await create_order_binance(order)
         order.status = OrderStatus.IN_PROGRESS
