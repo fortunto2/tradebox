@@ -1,10 +1,8 @@
 import json
-import logging
-from decimal import Decimal
-from pprint import pprint
 
 import asyncio
 from decimal import Decimal
+from logging.handlers import TimedRotatingFileHandler
 
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
 from sqlmodel import select
@@ -12,6 +10,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from core.binance_futures import client, check_position, cancel_open_orders, cancel_open_orders_manual
 from core.db_async import async_engine
+from core.logger import logger
 from core.models.orders import OrderStatus, OrderType, Order, OrderSide
 from core.schemas.events.account_update import AccountUpdateEvent, UpdateData
 from core.schemas.events.agg_trade import AggregatedTradeEvent
@@ -49,12 +48,12 @@ class TradeMonitor:
             if position_long:
                 self.long_position_qty = position_long.positionAmt
                 self.long_entry_price = position_long.breakEvenPrice
-                print(f"+LONG -> qty: {self.long_position_qty}, Entry price: {self.long_entry_price}")
+                logger.warning(f"{symbol} +LONG -> qty: {self.long_position_qty}, Entry price: {self.long_entry_price}")
 
             if position_short:
                 self.short_position_qty = position_short.positionAmt
                 self.short_entry_price = position_short.breakEvenPrice
-                print(f"-SHORT -> qty: {self.short_position_qty}, Entry price: {self.short_entry_price}")
+                logger.warning(f"{symbol} -SHORT -> qty: {self.short_position_qty}, Entry price: {self.short_entry_price}")
 
             self.client.agg_trade(symbol)
 
@@ -68,7 +67,7 @@ class TradeMonitor:
         asyncio.run(self.handle_message(msg))
 
     async def handle_message(self, msg):
-        # print(msg)
+        # logger.info(msg)
         message_dict = json.loads(msg)
         event_type = message_dict.get('e')
 
@@ -88,19 +87,19 @@ class TradeMonitor:
         trade_price = Decimal(event.price)
 
         self.long_pnl = 0
-        print(f'-----{event.symbol}------')
+        # logger.info(f'-----{event.symbol}------')
 
         if self.long_position_qty != 0:
             self.long_pnl = round((trade_price - self.long_entry_price) * self.long_position_qty, 2)
-            print(f"+Long PNL: {self.long_pnl}")
+            # logger.info(f"+Long PNL: {self.long_pnl}")
 
         if self.short_position_qty != 0:
             self.short_pnl = round((trade_price - self.short_entry_price) * self.short_position_qty, 2)
-            print(f"-Short PNL: {self.short_pnl}")
+            # logger.info(f"-Short PNL: {self.short_pnl}")
 
             _diff = round(self.long_pnl + self.short_pnl - Decimal(0.01), 2)
             if _diff > 0:
-                print(f"=Profit: {_diff} USDT")
+                logger.warning(f"=Profit: {_diff} USDT")
                 # close all positions, orders all
                 status_cancel = cancel_open_orders(symbol=event.symbol)
 
@@ -130,30 +129,30 @@ class TradeMonitor:
                         side=OrderSide.SELL,
                         session=session
                     )
-                print(f">>> Cancel all open orders: {status_cancel}")
+                logger.info(f">>> Cancel all open orders: {status_cancel}")
             else:
-                print(f"=Loss: {_diff} USDT")
+                logger.info(f"=Loss: {_diff} USDT")
 
     async def handle_order_update(self, event: OrderTradeUpdate):
         async with AsyncSession(async_engine) as session:
             if event.order_status == 'FILLED':
-                print(f"Order status: {event.order_status}")
-                print(f"Order side: {event.side}")
-                print(f"Order type: {event.order_type}")
-                print(f"Order position side: {event.position_side}")
-                print(f"Order quantity: {event.original_quantity}")
-                print(f"Order price: {event.original_price}")
+                logger.info(f"Order status: {event.order_status}")
+                logger.info(f"Order side: {event.side}")
+                logger.info(f"Order type: {event.order_type}")
+                logger.info(f"Order position side: {event.position_side}")
+                logger.info(f"Order quantity: {event.original_quantity}")
+                logger.info(f"Order price: {event.original_price}")
 
                 order_binance_id = event.order_id
-                print(f"Order binance_id: {order_binance_id}")
+                logger.info(f"Order binance_id: {order_binance_id}")
 
                 order: Order = await db_get_order_binance_id(order_binance_id, session)
                 if not order:
-                    print(f"!!!!!Order not found in DB - {order_binance_id}")
+                    logger.error(f"!!!!!Order not found in DB - {order_binance_id}")
 
                     webhook = await get_webhook_last(event.symbol, session)
                     if not webhook:
-                        print(f"!!!!!Webhook not found in DB - {event.symbol}")
+                        logger.error(f"!!!!!Webhook not found in DB - {event.symbol}")
                         return None
 
                     # открывает шорт
@@ -200,7 +199,7 @@ class TradeMonitor:
                     status_cancel = cancel_open_orders(symbol=order.symbol)
 
                 if order.type == OrderType.LONG_LIMIT:
-                    print(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
+                    logger.info(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
 
                     tp_order = await create_long_tp_order(
                         symbol=payload.symbol,
@@ -220,10 +219,10 @@ class TradeMonitor:
                             payload=payload,
                             session=session)
                     else:
-                        print(f"stop: filled_orders {filled_orders_in_db} >= grid_orders {grid_orders}")
+                        logger.info(f"stop: filled_orders {filled_orders_in_db} >= grid_orders {grid_orders}")
 
                 if order.type == OrderType.SHORT_STOP_LOSS:
-                    print(f"Order {order_binance_id} HEDGE_STOP_LOSS start make_hedge_by_pnl")
+                    logger.info(f"Order {order_binance_id} HEDGE_STOP_LOSS start make_hedge_by_pnl")
 
                     # открытие позиции - виртуальный ордер
                     await open_short_position_loop(
@@ -243,7 +242,7 @@ class TradeMonitor:
                         session=session
                     )
 
-                    print(f"Create short_stop_loss_order: {short_stop_loss_order.id}")
+                    logger.info(f"Create short_stop_loss_order: {short_stop_loss_order.id}")
 
                 await session.commit()
 
@@ -253,13 +252,13 @@ class TradeMonitor:
             if position.position_side == 'LONG':
                 self.long_position_qty = Decimal(position.position_amount)
                 self.long_entry_price = Decimal(position.breakeven_price)
-                print(f'UPDATE Long PNL: {position.unrealized_pnl}')
-                pprint(position)
+                logger.info(f'UPDATE Long PNL: {position.unrealized_pnl}')
+                logger.info(position)
             elif position.position_side == 'SHORT':
                 self.short_position_qty = Decimal(position.position_amount)
                 self.short_entry_price = Decimal(position.breakeven_price)
-                print(f'UPDATE Short PNL: {position.unrealized_pnl}')
-                pprint(position)
+                logger.info(f'UPDATE Short PNL: {position.unrealized_pnl}')
+                logger.info(position)
 
 
 async def check_orders(symbols, session):
@@ -268,7 +267,7 @@ async def check_orders(symbols, session):
         position_long, position_short = await check_position(symbol)
         #     if no postition set all orders in db status Canceled
         if not position_long.positionAmt:
-            print(f"no position in {symbol}")
+            logger.warning(f"no position in {symbol}")
             query = select(Order).where(Order.status == OrderStatus.IN_PROGRESS)
             result = await session.exec(query)
             for order in result.all():
@@ -293,8 +292,8 @@ async def async_main(symbol):
     # Assume async_engine and necessary imports are defined elsewhere
     async with AsyncSession(async_engine) as session:
         # symbols = await get_all_symbols(session)
-        # print('START MONITORING: ')
-        # print(symbols)
+        # logger.info('START MONITORING: ')
+        # logger.info(symbols)
 
         await check_orders([symbol], session)
         trade_monitor = TradeMonitor([symbol])
