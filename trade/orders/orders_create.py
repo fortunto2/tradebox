@@ -60,11 +60,13 @@ async def create_long_market_order(
 
     # while not Filled
     order = {'status': 'NEW'}
+    timer = 0
 
-    while order['status'] != 'FILLED':
+    while order['status'] != 'FILLED' or timer < 30:
         try:
             order = await get_order_id(symbol, order_binance_id)
         except Exception as e:
+            timer += 1
             print(e)
             await asyncio.sleep(1)
         market_order.binance_status = OrderBinanceStatus.FILLED
@@ -120,11 +122,13 @@ async def create_short_market_order(
 
     # while not Filled
     order = {'status': 'NEW'}
+    timer = 0
 
-    while order['status'] != 'FILLED':
+    while order['status'] != 'FILLED' and timer < 30:
         try:
             order = await get_order_id(symbol, order_binance_id)
         except Exception as e:
+            timer += 1
             print(e)
             await asyncio.sleep(1)
         market_order.binance_status = OrderBinanceStatus.FILLED
@@ -280,8 +284,9 @@ async def create_short_stop_order(
     )
 
     order_binance = None
+    timer = 0
 
-    while not order_binance:
+    while not order_binance and timer < 10:
 
         order.binance_id = await create_order_binance(order)
         order.status = OrderStatus.IN_PROGRESS
@@ -292,6 +297,7 @@ async def create_short_stop_order(
             order.binance_status = order_binance['status']
         except Exception as e:
             print(e)
+            timer += 1
 
         if not order_binance:
             print('!!!!Order not found, retrying')
@@ -349,8 +355,9 @@ async def create_short_stop_loss_order(
 
     # while not Filled
     order_binance = None
+    timer = 0
 
-    while not order_binance:
+    while not order_binance and timer < 10:
 
         order.binance_id = await create_order_binance(order)
         order.status = OrderStatus.IN_PROGRESS
@@ -365,6 +372,7 @@ async def create_short_stop_loss_order(
         if not order_binance:
             print('!!!!Order not found, retrying')
             await asyncio.sleep(5)
+            timer += 1
 
     session.add(order)
     await session.commit()
