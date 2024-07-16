@@ -62,8 +62,11 @@ async def create_long_market_order(
     order = {'status': 'NEW'}
 
     while order['status'] != 'FILLED':
-        order = await get_order_id(symbol, order_binance_id)
-        await asyncio.sleep(1)
+        try:
+            order = await get_order_id(symbol, order_binance_id)
+        except Exception as e:
+            print(e)
+            await asyncio.sleep(1)
         market_order.binance_status = OrderBinanceStatus.FILLED
 
     pprint(market_order.model_dump())
@@ -119,8 +122,11 @@ async def create_short_market_order(
     order = {'status': 'NEW'}
 
     while order['status'] != 'FILLED':
-        order = await get_order_id(symbol, order_binance_id)
-        await asyncio.sleep(1)
+        try:
+            order = await get_order_id(symbol, order_binance_id)
+        except Exception as e:
+            print(e)
+            await asyncio.sleep(1)
         market_order.binance_status = OrderBinanceStatus.FILLED
 
     pprint(market_order.model_dump())
@@ -281,8 +287,11 @@ async def create_short_stop_order(
         order.status = OrderStatus.IN_PROGRESS
         pprint(order.model_dump())
 
-        order_binance = await get_order_id(symbol, order.binance_id)
-        order.binance_status = order_binance['status']
+        try:
+            order_binance = await get_order_id(symbol, order.binance_id)
+            order.binance_status = order_binance['status']
+        except Exception as e:
+            print(e)
 
         if not order_binance:
             print('!!!!Order not found, retrying')
@@ -347,8 +356,11 @@ async def create_short_stop_loss_order(
         order.status = OrderStatus.IN_PROGRESS
         pprint(order.model_dump())
 
-        order_binance = await get_order_id(symbol, order.binance_id)
-        order.binance_status = order_binance['status']
+        try:
+            order_binance = await get_order_id(symbol, order.binance_id)
+            order.binance_status = order_binance['status']
+        except Exception as e:
+            print(e)
 
         if not order_binance:
             print('!!!!Order not found, retrying')
