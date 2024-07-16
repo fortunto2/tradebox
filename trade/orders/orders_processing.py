@@ -13,7 +13,7 @@ from core.schemas.position import ShortPosition
 from core.schemas.webhook import WebhookPayload
 from core.views.handle_orders import db_get_last_order, db_get_orders, get_webhook
 from trade.orders.grid import update_grid
-from trade.orders.orders_create import create_long_market_order,  \
+from trade.orders.orders_create import create_long_market_order, \
     create_long_tp_order, create_long_limit_order, create_short_stop_order
 
 
@@ -82,7 +82,6 @@ async def open_short_position_loop(
     )
 
     return hedge_stop_order.binance_id
-
 
 
 #
@@ -170,7 +169,7 @@ async def get_grid_orders(
     return orders
 
 
-async def check_orders_in_the_grid(payload: WebhookPayload, webhook_id):
+async def check_orders_in_the_grid(payload: WebhookPayload, webhook_id, session: AsyncSession = None):
     async with AsyncSession(async_engine) as session:
         grid_orders = await update_grid(payload, webhook_id, session)
 
@@ -206,7 +205,6 @@ async def grid_make_long_limit_order(
         if not payload:
             print("payload not found, webhook_id:", webhook_id)
             return False
-
 
         filled_orders, grid_orders, grid = await check_orders_in_the_grid(payload, webhook_id, session)
 
