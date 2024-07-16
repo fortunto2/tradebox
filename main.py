@@ -109,6 +109,9 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
 
     body.symbol = symbol
 
+    # todo: check if position already exists in db
+    # если слишком быстро пришло много вебхуков на один символ, все отработают
+
     position_long, _ = await check_position(symbol=symbol)
     position_long: LongPosition
 

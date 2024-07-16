@@ -267,7 +267,7 @@ class TradeMonitor:
 async def check_orders(symbols, session):
     for symbol in symbols:
         position_long, position_short = await check_position(symbol)
-        if not (position_long.positionAmt and position_short.positionAmt):
+        if not position_long.positionAmt:
             print(f"no position in {symbol}")
             query = select(Order).where(Order.status == OrderStatus.IN_PROGRESS)
             result = await session.exec(query)
