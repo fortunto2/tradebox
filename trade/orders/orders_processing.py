@@ -206,7 +206,7 @@ async def grid_make_long_limit_order(
             print("payload not found, webhook_id:", webhook_id)
             return False
 
-        filled_orders, grid_orders, grid = await check_orders_in_the_grid(payload, webhook_id, session)
+        filled_orders, grid_orders, grid = await check_orders_in_the_grid(payload, webhook_id)
 
         price, quantity = grid[len(filled_orders)]
 
