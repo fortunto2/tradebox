@@ -1,4 +1,5 @@
 import json
+import logging
 from decimal import Decimal
 from pprint import pprint
 
@@ -40,6 +41,7 @@ class TradeMonitor:
         asyncio.set_event_loop(self.loop)
 
     async def monitor_events(self):
+
         listen_key = client.new_listen_key().get('listenKey')
 
         for symbol in self.symbols:
@@ -66,6 +68,7 @@ class TradeMonitor:
         asyncio.run(self.handle_message(msg))
 
     async def handle_message(self, msg):
+        # print(msg)
         message_dict = json.loads(msg)
         event_type = message_dict.get('e')
 
@@ -102,6 +105,7 @@ class TradeMonitor:
                 status_cancel = cancel_open_orders(symbol=event.symbol)
 
                 async with AsyncSession(async_engine) as session:
+
                     webhook = await get_webhook_last(event.symbol, session)
                     webhook_id = webhook.id
 
@@ -245,6 +249,7 @@ class TradeMonitor:
 
     async def handle_account_update(self, event: UpdateData):
         for position in event.positions:
+
             if position.position_side == 'LONG':
                 self.long_position_qty = Decimal(position.position_amount)
                 self.long_entry_price = Decimal(position.breakeven_price)
@@ -256,24 +261,22 @@ class TradeMonitor:
                 print(f'UPDATE Short PNL: {position.unrealized_pnl}')
                 pprint(position)
 
-    async def restart_websockets(self):
-        while True:
-            await asyncio.sleep(3600)  # ждем 1 час
-            self.client.stop()
-            print("WebSocket connections stopped.")
-            await self.monitor_events()
-            print("WebSocket connections restarted.")
 
 async def check_orders(symbols, session):
     for symbol in symbols:
+        # check postitions
         position_long, position_short = await check_position(symbol)
+        #     if no postition set all orders in db status Canceled
         if not position_long.positionAmt:
             print(f"no position in {symbol}")
             query = select(Order).where(Order.status == OrderStatus.IN_PROGRESS)
             result = await session.exec(query)
             for order in result.all():
                 order.status = OrderStatus.CANCELED
+
             await session.commit()
+
+            # cancel_open_orders(symbol)
 
 
 import click
@@ -287,10 +290,15 @@ def main(symbol):
 
 
 async def async_main(symbol):
+    # Assume async_engine and necessary imports are defined elsewhere
     async with AsyncSession(async_engine) as session:
+        # symbols = await get_all_symbols(session)
+        # print('START MONITORING: ')
+        # print(symbols)
+
         await check_orders([symbol], session)
         trade_monitor = TradeMonitor([symbol])
-        asyncio.create_task(trade_monitor.restart_websockets())  # добавляем задачу перезапуска вебсокетов
+
         await trade_monitor.monitor_events()
 
 
