@@ -14,7 +14,7 @@ from pydantic import BaseModel
 def pydantic_serializer(value):
     if isinstance(value, BaseModel):
         # Pydantic модели имеют метод .json() для сериализации
-        return value.json()
+        return value.model_dump_json()
     else:
         # Для всех других объектов используем стандартный json.dumps
         # с установкой default=str, чтобы не пропустить объекты несериализуемые json'ом по умолчанию
@@ -22,7 +22,7 @@ def pydantic_serializer(value):
 
 
 async_engine = create_async_engine(
-    settings.DATABASE_URL,
+    settings.DB_ASYNC_CONNECTION_STR,
     echo=settings.DEBUG,
     future=True,
     json_serializer=pydantic_serializer,
