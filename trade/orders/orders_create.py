@@ -3,6 +3,8 @@ from decimal import Decimal
 import sys
 from pprint import pprint
 
+from core.db_async import async_engine
+
 sys.path.append('../../core')
 sys.path.append('')
 
@@ -36,46 +38,49 @@ async def create_long_market_order(
     """
     print("Market order LONG:")
 
-    market_order = Order(
-        position_side=OrderPositionSide.LONG,
-        side=side,
-        type=OrderType.LONG_MARKET,
+    async with AsyncSession(async_engine) as session:
 
-        symbol=symbol,
-        quantity=quantity,
-        leverage=leverage,
-        webhook_id=webhook_id,
-        order_number=0
-    )
+        market_order = Order(
+            position_side=OrderPositionSide.LONG,
+            side=side,
+            type=OrderType.LONG_MARKET,
 
-    order_binance_id = await create_order_binance(market_order)
-    market_order.binance_id = order_binance_id
+            symbol=symbol,
+            quantity=quantity,
+            leverage=leverage,
+            webhook_id=webhook_id,
+            order_number=0
+        )
 
-    position_long, _ = await check_position(symbol=symbol)
-    position_long: LongPosition
+        order_binance_id = await create_order_binance(market_order)
+        market_order.binance_id = order_binance_id
 
-    if position_long:
-        market_order.price = position_long.entryPrice
-        market_order.status = OrderStatus.FILLED
+        position_long, _ = await check_position(symbol=symbol)
+        position_long: LongPosition
 
-    # while not Filled
-    order = {'status': 'NEW'}
-    timer = 0
+        if position_long:
+            market_order.price = position_long.entryPrice
+            market_order.status = OrderStatus.FILLED
 
-    while order['status'] != 'FILLED' or timer < 30:
-        try:
-            order = await get_order_id(symbol, order_binance_id)
-        except Exception as e:
-            timer += 1
-            print(e)
-            await asyncio.sleep(1)
-        market_order.binance_status = OrderBinanceStatus.FILLED
+        # while not Filled
+        order = {'status': 'NEW'}
+        timer = 0
 
-    pprint(market_order.model_dump())
-    session.add(market_order)
-    await session.commit()
+        while order['status'] != 'FILLED' or timer < 30:
+            try:
+                order = await get_order_id(symbol, order_binance_id)
+            except Exception as e:
+                timer += 1
+                print(e)
+                await asyncio.sleep(1)
+            market_order.binance_status = OrderBinanceStatus.FILLED
 
-    return market_order
+        pprint(market_order.model_dump())
+        async with AsyncSession(async_engine) as session:
+            session.add(market_order)
+            await session.commit()
+
+        return market_order
 
 
 async def create_short_market_order(
@@ -134,8 +139,9 @@ async def create_short_market_order(
         market_order.binance_status = OrderBinanceStatus.FILLED
 
     pprint(market_order.model_dump())
-    session.add(market_order)
-    await session.commit()
+    async with AsyncSession(async_engine) as session:
+        session.add(market_order)
+        await session.commit()
 
     return market_order
 
@@ -200,8 +206,9 @@ async def create_long_tp_order(
 
     pprint(take_proffit_order.model_dump())
 
-    session.add(take_proffit_order)
-    await session.commit()
+    async with AsyncSession(async_engine) as session:
+        session.add(take_proffit_order)
+        await session.commit()
 
     return take_proffit_order
 
@@ -243,8 +250,9 @@ async def create_long_limit_order(
 
     pprint(limit_order.model_dump())
 
-    session.add(limit_order)
-    await session.commit()
+    async with AsyncSession(async_engine) as session:
+        session.add(limit_order)
+        await session.commit()
 
     return limit_order
 
@@ -303,8 +311,9 @@ async def create_short_stop_order(
             print('!!!!Order not found, retrying')
             await asyncio.sleep(5)
 
-    session.add(order)
-    await session.commit()
+    async with AsyncSession(async_engine) as session:
+        session.add(order)
+        await session.commit()
 
     return order
 
@@ -374,7 +383,8 @@ async def create_short_stop_loss_order(
             await asyncio.sleep(5)
             timer += 1
 
-    session.add(order)
-    await session.commit()
+    async with AsyncSession(async_engine) as session:
+        session.add(order)
+        await session.commit()
 
     return order
