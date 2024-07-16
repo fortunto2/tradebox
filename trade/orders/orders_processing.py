@@ -171,7 +171,7 @@ async def get_grid_orders(
 
 
 async def check_orders_in_the_grid(payload: WebhookPayload, webhook_id):
-    with AsyncSession(async_engine) as session:
+    async with AsyncSession(async_engine) as session:
         grid_orders = await update_grid(payload, webhook_id, session)
 
         grid = list(zip(grid_orders["long_orders"], grid_orders["martingale_orders"]))
@@ -201,7 +201,7 @@ async def grid_make_long_limit_order(
     :return: Вернет True если есть еще ордера в сетке, False если последний ордер
     """
 
-    with AsyncSession(async_engine) as session:
+    async with AsyncSession(async_engine) as session:
 
         if not payload:
             print("payload not found, webhook_id:", webhook_id)
