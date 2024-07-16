@@ -9,12 +9,12 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 class BaseTable(SQLModel):
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=datetime.now,
         nullable=False,
     )
 
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=datetime.now,
         nullable=False,
     )
 
