@@ -24,6 +24,8 @@ sqladmin = "^0.18.0"
 click = "^8.1.7"
 alembic = "^1.13.2"
 asyncpg = "^0.29.0"
+sentry-sdk = { extras = ["fastapi"], version = "^2.10" }
+
 
 
 [tool.poetry.group.dev.dependencies]

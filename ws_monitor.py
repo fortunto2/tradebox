@@ -1,5 +1,18 @@
 import json
 
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for performance monitoring.
+    traces_sample_rate=1.0,
+    # Set profiles_sample_rate to 1.0 to profile 100%
+    # of sampled transactions.
+    # We recommend adjusting this value in production.
+    profiles_sample_rate=1.0,
+)
+
 import asyncio
 from decimal import Decimal
 from logging.handlers import TimedRotatingFileHandler
