@@ -152,7 +152,7 @@ async def create_long_tp_order(
         tp: Decimal,
         leverage: int,
         webhook_id,
-        session: AsyncSession
+        session: AsyncSession = None
 ) -> Order:
     """
     (LONG-SELL-TAKE_PROFIT[LIMIT] ) - сверху.
@@ -171,42 +171,43 @@ async def create_long_tp_order(
     """
     print("Take proffit order:")
 
-    # remove old tp orders
-    orders = await db_get_all_order(webhook_id, OrderStatus.IN_PROGRESS, OrderType.LONG_TAKE_PROFIT, session)
-    for order in orders:
-        try:
-            result = await cancel_order_binance(symbol, order.binance_id)
-            if result['status'] == 'CANCELED':
-                order.status = OrderStatus.CANCELED
-                session.add(order)
-        except Exception as e:
-            print(e)
-
-    position_long, _ = await check_position(symbol=symbol)
-    position_long: LongPosition
-
-    tp_price = Decimal(position_long.breakEvenPrice) * (1 + Decimal(tp) / 100)
-
-    # любое измение позиции, если поменялась что нибудь, берем из позиции новый обьем и цену.
-    take_proffit_order = Order(
-        position_side=OrderPositionSide.LONG,
-        side=OrderSide.SELL,
-        type=OrderType.LONG_TAKE_PROFIT,
-
-        symbol=symbol,
-        quantity=position_long.positionAmt,
-        leverage=leverage,
-        webhook_id=webhook_id,
-        price=tp_price
-    )
-    # старый надо отменить, запоминать старый.
-
-    take_proffit_order.binance_id = await create_order_binance(take_proffit_order)
-    take_proffit_order.status = OrderStatus.IN_PROGRESS
-
-    pprint(take_proffit_order.model_dump())
-
     async with AsyncSession(async_engine) as session:
+
+        # remove old tp orders
+        orders = await db_get_all_order(webhook_id, OrderStatus.IN_PROGRESS, OrderType.LONG_TAKE_PROFIT, session)
+        for order in orders:
+            try:
+                result = await cancel_order_binance(symbol, order.binance_id)
+                if result['status'] == 'CANCELED':
+                    order.status = OrderStatus.CANCELED
+                    session.add(order)
+            except Exception as e:
+                print(e)
+
+        position_long, _ = await check_position(symbol=symbol)
+        position_long: LongPosition
+
+        tp_price = Decimal(position_long.breakEvenPrice) * (1 + Decimal(tp) / 100)
+
+        # любое измение позиции, если поменялась что нибудь, берем из позиции новый обьем и цену.
+        take_proffit_order = Order(
+            position_side=OrderPositionSide.LONG,
+            side=OrderSide.SELL,
+            type=OrderType.LONG_TAKE_PROFIT,
+
+            symbol=symbol,
+            quantity=position_long.positionAmt,
+            leverage=leverage,
+            webhook_id=webhook_id,
+            price=tp_price
+        )
+        # старый надо отменить, запоминать старый.
+
+        take_proffit_order.binance_id = await create_order_binance(take_proffit_order)
+        take_proffit_order.status = OrderStatus.IN_PROGRESS
+
+        pprint(take_proffit_order.model_dump())
+
         session.add(take_proffit_order)
         await session.commit()
 

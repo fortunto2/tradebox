@@ -24,24 +24,19 @@ async def open_long_position(payload: WebhookPayload, webhook_id, session: Async
         quantity=payload.open.amount,
         leverage=payload.open.leverage,
         webhook_id=webhook_id,
-        session=session
     )
-
-    await session.commit()
 
     tp_order = await create_long_tp_order(
         symbol=payload.symbol,
         tp=payload.settings.tp,
         leverage=payload.open.leverage,
         webhook_id=webhook_id,
-        session=session,
     )
 
     # первый запуск создание пары ордеров лимитных по сетки
     await grid_make_long_limit_order(
         webhook_id=webhook_id,
         payload=payload,
-        session=session
     )
 
     return
