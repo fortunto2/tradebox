@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "sqlite+aiosqlite:///./test.db"
 
-    DB_ASYNC_CONNECTION_STR: str ="postgresql+asyncpg://postgres:rust_admin@45.32.253.11:5432/tradebox"
+    DB_ASYNC_CONNECTION_STR: str ="postgresql+asyncpg://postgres:rust_admin@localhost:5432/tradebox"
 
     class Config:
         case_sensitive = True
