@@ -170,22 +170,23 @@ async def get_grid_orders(
     return orders
 
 
-async def check_orders_in_the_grid(payload: WebhookPayload, webhook_id, session: AsyncSession):
-    grid_orders = await update_grid(payload, webhook_id, session)
+async def check_orders_in_the_grid(payload: WebhookPayload, webhook_id):
+    with AsyncSession(async_engine) as session:
+        grid_orders = await update_grid(payload, webhook_id, session)
 
-    grid = list(zip(grid_orders["long_orders"], grid_orders["martingale_orders"]))
-    print(f"grid_orders: {len(grid)}")
+        grid = list(zip(grid_orders["long_orders"], grid_orders["martingale_orders"]))
+        print(f"grid_orders: {len(grid)}")
 
-    # ищем уже созданные в базе выполненные ордера
-    filled_orders = await get_grid_orders(
-        symbol=payload.symbol,
-        status=OrderStatus.FILLED,
-        webhook_id=webhook_id,
-        session=session)
+        # ищем уже созданные в базе выполненные ордера
+        filled_orders = await get_grid_orders(
+            symbol=payload.symbol,
+            status=OrderStatus.FILLED,
+            webhook_id=webhook_id,
+            session=session)
 
-    print(f"filled_orders: {len(filled_orders)}")
+        print(f"filled_orders: {len(filled_orders)}")
 
-    return filled_orders, grid_orders, grid
+        return filled_orders, grid_orders, grid
 
 
 async def grid_make_long_limit_order(
@@ -200,45 +201,47 @@ async def grid_make_long_limit_order(
     :return: Вернет True если есть еще ордера в сетке, False если последний ордер
     """
 
-    if not payload:
-        print("payload not found, webhook_id:", webhook_id)
-        return False
+    with AsyncSession(async_engine) as session:
+
+        if not payload:
+            print("payload not found, webhook_id:", webhook_id)
+            return False
 
 
-    filled_orders, grid_orders, grid = await check_orders_in_the_grid(payload, webhook_id, session)
+        filled_orders, grid_orders, grid = await check_orders_in_the_grid(payload, webhook_id, session)
 
-    price, quantity = grid[len(filled_orders)]
+        price, quantity = grid[len(filled_orders)]
 
-    limit_order = await create_long_limit_order(
-        symbol=payload.symbol,
-        price=price,
-        quantity=quantity,
-        leverage=payload.open.leverage,
-        webhook_id=webhook_id,
-        session=session,
-    )
-
-    if len(filled_orders) == len(grid) - 1:
-        # предпоследний ордер запускается вместе с хедж шорт
-        # todo: только один раз, когда хватает денег
-
-        short_order_price = Decimal(price) * Decimal(1 - payload.settings.offset_short / 100)
-        short_order_amount = Decimal(payload.settings.extramarg * payload.open.leverage) / short_order_price
-
-        time.sleep(0.5)
-
-        await create_short_stop_order(
+        limit_order = await create_long_limit_order(
             symbol=payload.symbol,
-            price=short_order_price,
-            quantity=short_order_amount,
+            price=price,
+            quantity=quantity,
             leverage=payload.open.leverage,
             webhook_id=webhook_id,
             session=session,
         )
 
-    await session.commit()
+        if len(filled_orders) == len(grid) - 1:
+            # предпоследний ордер запускается вместе с хедж шорт
+            # todo: только один раз, когда хватает денег
 
-    return True
+            short_order_price = Decimal(price) * Decimal(1 - payload.settings.offset_short / 100)
+            short_order_amount = Decimal(payload.settings.extramarg * payload.open.leverage) / short_order_price
+
+            time.sleep(0.5)
+
+            await create_short_stop_order(
+                symbol=payload.symbol,
+                price=short_order_price,
+                quantity=short_order_amount,
+                leverage=payload.open.leverage,
+                webhook_id=webhook_id,
+                session=session,
+            )
+
+        await session.commit()
+
+        return True
 
 
 def wait_limit_order_filled(symbol, order_id):
