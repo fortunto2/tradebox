@@ -1,131 +1,100 @@
 import json
-
 import sentry_sdk
-
-sentry_sdk.init(
-    dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for performance monitoring.
-    traces_sample_rate=1.0,
-    # Set profiles_sample_rate to 1.0 to profile 100%
-    # of sampled transactions.
-    # We recommend adjusting this value in production.
-    profiles_sample_rate=1.0,
-)
-
 import asyncio
 from decimal import Decimal
-from logging.handlers import TimedRotatingFileHandler
 
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from core.binance_futures import client, check_position, cancel_open_orders, cancel_open_orders_manual
-from core.db_async import async_engine
+from config import get_settings
+from core.binance_futures import client, check_position, cancel_open_orders
+from core.db_async import async_session
 from core.logger import logger
-from core.models.orders import OrderStatus, OrderType, Order, OrderSide
-from core.schemas.events.account_update import AccountUpdateEvent, UpdateData
+from core.models.orders import OrderStatus, Order, OrderSide, OrderType
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdateEvent, OrderTradeUpdate
+from core.schemas.events.account_update import AccountUpdateEvent, UpdateData
 from core.schemas.webhook import WebhookPayload
-from core.views.handle_orders import db_get_order_binance_id, get_webhook, get_webhook_last, get_all_symbols
-from trade.orders.orders_create import create_short_stop_loss_order, create_short_stop_order, create_long_limit_order, \
-    create_long_tp_order, create_short_market_order, create_long_market_order
-from trade.orders.orders_processing import grid_make_long_limit_order, check_orders_in_the_grid, \
+from core.views.handle_orders import db_get_order_binance_id, get_webhook_last
+from trade.orders.orders_create import create_short_stop_loss_order, create_long_market_order, \
+    create_short_market_order, create_short_stop_order, create_long_tp_order
+from trade.orders.orders_processing import check_orders_in_the_grid, grid_make_long_limit_order, \
     open_short_position_loop
+
+settings = get_settings()
+
+# Sentry Initialization
+sentry_sdk.init(
+    dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
 
 
 class TradeMonitor:
     def __init__(self, symbols):
         self.symbols = symbols
-
         self.long_position_qty = Decimal(0)
         self.long_entry_price = Decimal(0)
         self.short_position_qty = Decimal(0)
         self.short_entry_price = Decimal(0)
         self.client = UMFuturesWebsocketClient(on_message=self.on_message)
-
         self.long_pnl = 0
         self.short_pnl = 0
-
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
     async def monitor_events(self):
-
         listen_key = client.new_listen_key().get('listenKey')
-
         for symbol in self.symbols:
             position_long, position_short = await check_position(symbol)
             if position_long:
                 self.long_position_qty = position_long.positionAmt
                 self.long_entry_price = position_long.breakEvenPrice
                 logger.warning(f"{symbol} +LONG -> qty: {self.long_position_qty}, Entry price: {self.long_entry_price}")
-
             if position_short:
                 self.short_position_qty = position_short.positionAmt
                 self.short_entry_price = position_short.breakEvenPrice
-                logger.warning(f"{symbol} -SHORT -> qty: {self.short_position_qty}, Entry price: {self.short_entry_price}")
-
+                logger.warning(
+                    f"{symbol} -SHORT -> qty: {self.short_position_qty}, Entry price: {self.short_entry_price}")
             self.client.agg_trade(symbol)
-
         self.client.user_data(listen_key=listen_key)
 
     def on_message(self, ws, msg):
-        # Schedule the coroutine from a synchronous context using the instance's event loop
         if self.loop.is_closed():
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
         asyncio.run(self.handle_message(msg))
 
     async def handle_message(self, msg):
-        # logger.info(msg)
         message_dict = json.loads(msg)
         event_type = message_dict.get('e')
-
         if event_type == 'aggTrade':
             event = AggregatedTradeEvent.parse_obj(message_dict)
             await self.handle_agg_trade(event)
-
         elif event_type == 'ORDER_TRADE_UPDATE':
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
             await self.handle_order_update(event)
-
         elif event_type == 'ACCOUNT_UPDATE':
             event = UpdateData.parse_obj(message_dict['a'])
             await self.handle_account_update(event)
 
     async def handle_agg_trade(self, event: AggregatedTradeEvent):
         trade_price = Decimal(event.price)
-
         self.long_pnl = 0
-        # logger.info(f'-----{event.symbol}------')
-
         if self.long_position_qty != 0:
             self.long_pnl = round((trade_price - self.long_entry_price) * self.long_position_qty, 2)
-            # logger.info(f"+Long PNL: {self.long_pnl}")
-
         if self.short_position_qty != 0:
             self.short_pnl = round((trade_price - self.short_entry_price) * self.short_position_qty, 2)
-            # logger.info(f"-Short PNL: {self.short_pnl}")
-
             _diff = round(self.long_pnl + self.short_pnl - Decimal(0.01), 2)
             if _diff > 0:
                 logger.warning(f"=Profit: {_diff} USDT")
-                # close all positions, orders all
                 status_cancel = cancel_open_orders(symbol=event.symbol)
-
-                async with AsyncSession(async_engine) as session:
-
+                async with async_session() as session:
                     webhook = await get_webhook_last(event.symbol, session)
                     webhook_id = webhook.id
-
-                    if 'leverage' in webhook.open:
-                        leverage = webhook.open['leverage']
-                    else:
-                        leverage = webhook.open.leverage
-
+                    leverage = webhook.open.get('leverage', webhook.open.leverage)
                     await create_short_market_order(
                         symbol=event.symbol,
                         quantity=abs(self.short_position_qty),
@@ -147,28 +116,18 @@ class TradeMonitor:
                 logger.info(f"=Loss: {_diff} USDT")
 
     async def handle_order_update(self, event: OrderTradeUpdate):
-        async with AsyncSession(async_engine) as session:
+        async with async_session() as session:
             if event.order_status == 'FILLED':
                 logger.info(f"Order status: {event.order_status}")
-                logger.info(f"Order side: {event.side}")
-                logger.info(f"Order type: {event.order_type}")
-                logger.info(f"Order position side: {event.position_side}")
-                logger.info(f"Order quantity: {event.original_quantity}")
-                logger.info(f"Order price: {event.original_price}")
-
                 order_binance_id = event.order_id
                 logger.info(f"Order binance_id: {order_binance_id}")
-
                 order: Order = await db_get_order_binance_id(order_binance_id, session)
                 if not order:
                     logger.error(f"!!!!!Order not found in DB - {order_binance_id}")
-
                     webhook = await get_webhook_last(event.symbol, session)
                     if not webhook:
                         logger.error(f"!!!!!Webhook not found in DB - {event.symbol}")
                         return None
-
-                    # открывает шорт
                     if event.side == 'SELL' and event.position_side == 'SHORT':
                         order = await create_short_stop_order(
                             symbol=event.symbol,
@@ -176,29 +135,22 @@ class TradeMonitor:
                             quantity=Decimal(event.original_quantity),
                             leverage=webhook.open.leverage,
                             webhook_id=webhook.id,
-                            session=session
                         )
-                    # закрытие позиции
                     elif event.side == 'BUY' and event.position_side == 'SHORT':
                         order = await create_short_stop_loss_order(
                             symbol=event.symbol,
                             sl_short=webhook.settings.sl_short,
                             leverage=webhook.open.leverage,
                             webhook_id=webhook.id,
-                            session=session
                         )
                     else:
                         return None
-
                 order.binance_id = order_binance_id
                 order.status = OrderStatus.FILLED
                 order.binance_status = event.order_status
                 await session.flush()
-
                 webhook = order.webhook
                 webhook_id = order.webhook.id
-
-                # todo rewrite all to sql model
                 payload = WebhookPayload(
                     name=webhook.name,
                     side=order.side,
@@ -207,61 +159,44 @@ class TradeMonitor:
                     open=webhook.open,
                     settings=webhook.settings
                 )
-
                 if order.type == OrderType.LONG_TAKE_PROFIT:
                     status_cancel = cancel_open_orders(symbol=order.symbol)
-
                 if order.type == OrderType.LONG_LIMIT:
                     logger.info(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
-
                     tp_order = await create_long_tp_order(
                         symbol=payload.symbol,
                         tp=payload.settings.tp,
                         leverage=payload.open.leverage,
                         webhook_id=webhook_id,
-                        session=session,
                     )
-
                     filled_orders_in_db, grid_orders, grid = await check_orders_in_the_grid(
                         payload, webhook_id, session)
-
-                    # когда последний заканчивет сетку, +1 это маркет ордер
                     if len(grid) >= len(filled_orders_in_db):
                         await grid_make_long_limit_order(
                             webhook_id=webhook_id,
-                            payload=payload,
-                            session=session)
+                            payload=payload
+                        )
                     else:
                         logger.info(f"stop: filled_orders {filled_orders_in_db} >= grid_orders {grid_orders}")
-
                 if order.type == OrderType.SHORT_STOP_LOSS:
                     logger.info(f"Order {order_binance_id} HEDGE_STOP_LOSS start make_hedge_by_pnl")
-
-                    # открытие позиции - виртуальный ордер
                     await open_short_position_loop(
                         payload=payload,
                         webhook_id=order.webhook_id,
                         order_binance_id=order_binance_id,
-                        session=session
                     )
-
-                # первый. ставиться снизу
                 if order.type == OrderType.SHORT_LIMIT:
                     short_stop_loss_order = await create_short_stop_loss_order(
                         symbol=payload.symbol,
                         sl_short=payload.settings.sl_short,
                         leverage=payload.open.leverage,
-                        webhook_id=order.webhook_id,
-                        session=session
+                        webhook_id=order.webhook_id
                     )
-
                     logger.info(f"Create short_stop_loss_order: {short_stop_loss_order.id}")
-
                 await session.commit()
 
     async def handle_account_update(self, event: UpdateData):
         for position in event.positions:
-
             if position.position_side == 'LONG':
                 self.long_position_qty = Decimal(position.position_amount)
                 self.long_entry_price = Decimal(position.breakeven_price)
@@ -274,21 +209,16 @@ class TradeMonitor:
                 logger.info(position)
 
 
-async def check_orders(symbols, session):
+async def check_orders(symbols, session: AsyncSession):
     for symbol in symbols:
-        # check postitions
         position_long, position_short = await check_position(symbol)
-        #     if no postition set all orders in db status Canceled
         if not position_long.positionAmt:
             logger.warning(f"no position in {symbol}")
             query = select(Order).where(Order.status == OrderStatus.IN_PROGRESS)
             result = await session.exec(query)
             for order in result.all():
                 order.status = OrderStatus.CANCELED
-
             await session.commit()
-
-            # cancel_open_orders(symbol)
 
 
 import click
@@ -302,15 +232,9 @@ def main(symbol):
 
 
 async def async_main(symbol):
-    # Assume async_engine and necessary imports are defined elsewhere
-    async with AsyncSession(async_engine) as session:
-        # symbols = await get_all_symbols(session)
-        # logger.info('START MONITORING: ')
-        # logger.info(symbols)
-
+    async with async_session() as session:
         await check_orders([symbol], session)
         trade_monitor = TradeMonitor([symbol])
-
         await trade_monitor.monitor_events()
 
 

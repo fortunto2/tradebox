@@ -1,7 +1,6 @@
 import json
 
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from config import get_settings
@@ -21,15 +20,34 @@ def pydantic_serializer(value):
         return json.dumps(value, default=str)
 
 
-async_engine = create_async_engine(
-    settings.DB_ASYNC_CONNECTION_STR,
-    echo=settings.DEBUG,
-    future=True,
-    json_serializer=pydantic_serializer,
-    connect_args={'timeout': 15}
-)
+if 'sqlite' in settings.DB_ASYNC_CONNECTION_STR:
 
-async_session = sessionmaker(bind=async_engine, class_=AsyncSession, expire_on_commit=False)
+    async_engine = create_async_engine(
+        settings.DB_ASYNC_CONNECTION_STR,
+        echo=settings.DEBUG,
+        future=True,
+        json_serializer=pydantic_serializer,
+        connect_args={
+            'timeout': 15,
+        }
+
+    )
+else:
+    async_engine = create_async_engine(
+        settings.DB_ASYNC_CONNECTION_STR,
+        echo=settings.DEBUG,
+        future=True,
+        json_serializer=pydantic_serializer,
+        connect_args={
+            'timeout': 15,
+            'statement_cache_size': 0,
+        },
+        pool_recycle=3600,
+        pool_size=100
+    )
+
+
+async_session = async_sessionmaker(bind=async_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def get_async_session():
