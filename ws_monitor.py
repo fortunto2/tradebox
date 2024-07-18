@@ -143,8 +143,9 @@ class TradeMonitor:
                     if not order:
                         sleep(2)
                         order: Order = db_get_order_binance_id(order_binance_id)
-                        logger.error(f"!!!!!Order not found in DB - {order_binance_id}")
-                        return None
+                        if not order:
+                            logger.error(f"!!!!!Order not found in DB - {order_binance_id}")
+                            return None
 
                     webhook = get_webhook_last(event.symbol)
                     if not webhook:
