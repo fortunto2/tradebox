@@ -119,6 +119,9 @@ class TradeMonitor:
         try:
             with SessionLocal() as session:
 
+                if event.symbol not in self.symbols:
+                    return None
+
                 if event.order_status == 'FILLED':
 
                     if event.order_type == 'MARKET':
