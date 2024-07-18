@@ -1,6 +1,6 @@
 import asyncio
 from datetime import time
-from functools import lru_cache
+from functools import lru_cache, cache
 from time import sleep
 from typing import List
 
@@ -30,7 +30,7 @@ client = UMFutures(key=settings.BINANCE_API_KEY, secret=settings.BINANCE_API_SEC
 # print(client.account())
 
 
-@lru_cache()
+@cache
 def get_symbol_info(symbol):
     exchange_info = client.exchange_info()
     for s in exchange_info['symbols']:
@@ -47,7 +47,6 @@ def adjust_precision(value, precision):
     return value.quantize(Decimal(quantize_str), rounding=ROUND_DOWN)
 
 
-@lru_cache()
 def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
     symbol_info = get_symbol_info(symbol)
     if not symbol_info:

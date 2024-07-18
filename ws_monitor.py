@@ -123,6 +123,10 @@ class TradeMonitor:
 
                 if event.order_status == 'FILLED':
 
+                    if event.order_type == 'MARKET':
+                        logger.warning(f"Order Market Filled: {event.order_status}, {event.order_type}")
+                        return None
+
                     logger.info(f"Order status: {event.order_status}")
                     order_binance_id = event.order_id
                     logger.info(f"Order binance_id: {order_binance_id}")
@@ -182,11 +186,11 @@ class TradeMonitor:
                         open=webhook.open,
                         settings=webhook.settings
                     )
+                    #
+                    # if order.type == OrderType.LONG_MARKET or order.type == OrderType.SHORT_MARKET:
+                    #     logger.warning(f"Order Market Filled: {event.order_status}, {order.type}")
 
-                    if order.type == OrderType.LONG_MARKET or order.type == OrderType.SHORT_MARKET:
-                        logger.warning(f"Order Market Filled: {event.order_status}, {order.type}")
-
-                    elif order.type == OrderType.LONG_TAKE_PROFIT:
+                    if order.type == OrderType.LONG_TAKE_PROFIT:
                         status_cancel = cancel_open_orders(symbol=order.symbol)
                     elif order.type == OrderType.LONG_LIMIT:
                         logger.info(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
