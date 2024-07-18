@@ -21,7 +21,7 @@ settings = get_settings()
 
 # Create a synchronous SQLAlchemy engine
 sync_engine = create_engine(
-    settings.DB_ASYNC_CONNECTION_STR,
+    settings.DB_CONNECTION_STR,
     echo=settings.DEBUG,
     future=True,
     json_serializer=pydantic_serializer,
