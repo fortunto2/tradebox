@@ -23,7 +23,7 @@ def pydantic_serializer(value):
 if 'sqlite' in settings.DB_ASYNC_CONNECTION_STR:
 
     async_engine = create_async_engine(
-        settings.DB_ASYNC_CONNECTION_STR,
+        'sqlite+aiosqlite:///./test.db',
         echo=settings.DEBUG,
         future=True,
         json_serializer=pydantic_serializer,

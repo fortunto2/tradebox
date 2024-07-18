@@ -1,230 +1,206 @@
 import logging
-
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
-from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
-
-from core.db_async import async_engine
+from sqlmodel import select, Session
 from core.models.orders import Order, OrderStatus, OrderType, OrderPositionSide, OrderSide
-
 from core.models.webhook import WebHook
 from core.schemas.webhook import WebhookPayload
+from core.db_sync import execute_sqlmodel_query, execute_sqlmodel_query_single
 
 
-async def load_new_orders(session: AsyncSession, symbol: str = None):
+def load_new_orders(symbol: str = None):
     """
     Load all orders from db by symbol and status NEW
-    :param status:
-    :param session: The async session to use for the query
     :param symbol: The symbol of the order to monitor
     :return: The order status
     """
-    status: OrderStatus = OrderStatus.NEW
+    def query_func(session):
+        status = OrderStatus.NEW
 
-    subquery_in_progress = (
-        select(Order.symbol)
-        .where(Order.status == OrderStatus.IN_PROGRESS.value)
-        .group_by(Order.symbol)
-        .subquery()
-    )
-
-    if symbol:
-        # If a specific symbol is provided, get the order with the highest order_number for that symbol
-        subquery = (
-            select(Order.symbol, func.min(Order.order_number).label("min_order_number"))
-            .where(Order.symbol == symbol, Order.status == status.value)
-            .group_by(Order.symbol)
-            .subquery()
-        )
-    else:
-        # If no specific symbol is provided, get the orders with the highest order_number for each symbol
-        subquery = (
-            select(Order.symbol, func.min(Order.order_number).label("min_order_number"))
-            .where(Order.status == status.value)
+        subquery_in_progress = (
+            select(Order.symbol)
+            .where(Order.status == OrderStatus.IN_PROGRESS.value)
             .group_by(Order.symbol)
             .subquery()
         )
 
-    query = (
-        select(Order)
-        .join(subquery, (Order.symbol == subquery.c.symbol) & (Order.order_number == subquery.c.min_order_number))
-        .outerjoin(subquery_in_progress, Order.symbol == subquery_in_progress.c.symbol)
-        .where(subquery_in_progress.c.symbol == None)
-        # Exclude orders if any order in the group has the status IN_PROGRESS
-    )
+        if symbol:
+            subquery = (
+                select(Order.symbol, func.min(Order.order_number).label("min_order_number"))
+                .where(Order.symbol == symbol, Order.status == status.value)
+                .group_by(Order.symbol)
+                .subquery()
+            )
+        else:
+            subquery = (
+                select(Order.symbol, func.min(Order.order_number).label("min_order_number"))
+                .where(Order.status == status.value)
+                .group_by(Order.symbol)
+                .subquery()
+            )
 
-    result = await session.exec(query)
-    return result.all()
+        query = (
+            select(Order)
+            .join(subquery, (Order.symbol == subquery.c.symbol) & (Order.order_number == subquery.c.min_order_number))
+            .outerjoin(subquery_in_progress, Order.symbol == subquery_in_progress.c.symbol)
+            .where(subquery_in_progress.c.symbol == None)
+        )
+
+        result = session.exec(query)
+        return result.all()
+
+    return execute_sqlmodel_query(query_func)
 
 
-async def load_in_progress_orders(session: AsyncSession):
+def load_in_progress_orders():
     """
     Load all orders with status IN_PROGRESS from the database.
     """
-    query = select(Order).where(Order.status == OrderStatus.IN_PROGRESS)
-    result = await session.exec(query)
-    return result.all()
+    def query_func(session):
+        query = select(Order).where(Order.status == OrderStatus.IN_PROGRESS)
+        result = session.exec(query)
+        return result.all()
+
+    return execute_sqlmodel_query(query_func)
 
 
-async def get_webhook(webhook_id: str, session: AsyncSession) -> WebHook:
-    query = select(WebHook).where(WebHook.id == webhook_id)
-    result = await session.exec(query)
-    return result.first()
+def get_webhook(webhook_id: str) -> WebHook:
+    def query_func(session):
+        query = select(WebHook).where(WebHook.id == webhook_id)
+        result = session.exec(query)
+        return result.first()
+
+    return execute_sqlmodel_query_single(query_func)
 
 
-async def get_webhook_last(symbol: str, session: AsyncSession) -> WebHook:
-    query = select(WebHook).where(WebHook.symbol == symbol).order_by(WebHook.id.desc())
-    result = await session.exec(query)
-    return result.first()
+def get_webhook_last(symbol: str) -> WebHook:
+    def query_func(session):
+        query = select(WebHook).where(WebHook.symbol == symbol).order_by(WebHook.id.desc())
+        result = session.exec(query)
+        return result.first()
+
+    return execute_sqlmodel_query_single(query_func)
 
 
-async def get_all_symbols(session: AsyncSession, status=None) -> list:
-    # all orders in select in_progress nad group by symbols
-    if status is None:
-        query = select(Order).group_by(Order.symbol)
-    else:
-        query = select(Order).where(Order.status == status).group_by(Order.symbol)
-    result = await session.exec(query)
-    list_symbols = [order.symbol for order in result.all()]
-    return list_symbols
+def get_all_symbols(status=None) -> list:
+    def query_func(session):
+        if status is None:
+            query = select(Order).group_by(Order.symbol)
+        else:
+            query = select(Order).where(Order.status == status).group_by(Order.symbol)
+        result = session.exec(query)
+        list_symbols = [order.symbol for order in result.all()]
+        return list_symbols
+
+    return execute_sqlmodel_query(query_func)
 
 
-async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.LONG_MARKET):
-    """
-    Load all orders with status webhook, status Filled, Market type.
-    """
-    query = select(Order).where(
-        Order.webhook_id == webhook_id,
-        Order.status == OrderStatus.FILLED,
-        Order.type == order_type
-    ).order_by(Order.id.desc())
+def db_get_last_order(webhook_id, order_type=OrderType.LONG_MARKET, order_by='desc') -> Order:
+    def query_func(session):
+        query = select(Order).where(
+            Order.webhook_id == webhook_id,
+            Order.status == OrderStatus.FILLED,
+            Order.type == order_type
+        )
 
-    result = await session.exec(query)
-    return result.first()
+        if order_by == 'desc':
+            query = query.order_by(Order.id.desc())
+        else:
+            query = query.order_by(Order.id.asc())
 
+        result = session.exec(query)
+        return result.first()
 
-async def db_get_last_order(webhook_id, session: AsyncSession, order_type=OrderType.LONG_MARKET,
-                            order_by='desc') -> Order:
-    """
-    Load all orders with status webhook, status Filled, Market type.
-    """
-
-    query = select(Order).where(
-        Order.webhook_id == webhook_id,
-        Order.status == OrderStatus.FILLED,
-        Order.type == order_type
-    )
-
-    if order_by == 'desc':
-        query = query.order_by(Order.id.desc())
-    else:
-        query = query.order_by(Order.id.asc())
-
-    result = await session.exec(query)
-    return result.first()
+    return execute_sqlmodel_query_single(query_func)
 
 
-async def db_get_orders(
+def db_get_orders(
         webhook_id,
         order_status: OrderStatus,
         position_side: OrderPositionSide,
         order_type: OrderType,
         order_side: OrderSide,
-        session: AsyncSession,
-):
-    """
-    Load all orders grid
-    """
-    query = select(Order).where(
-        Order.webhook_id == webhook_id,
-        Order.status == order_status,
-        Order.type == order_type,
-        Order.position_side == position_side,
-        Order.side == order_side
-    ).order_by(Order.id.asc())
+) -> list:
+    def query_func(session):
+        query = select(Order).where(
+            Order.webhook_id == webhook_id,
+            Order.status == order_status,
+            Order.type == order_type,
+            Order.position_side == position_side,
+            Order.side == order_side
+        ).order_by(Order.id.asc())
 
-    result = await session.exec(query)
-    return result.all()
+        result = session.exec(query)
+        return result.all()
+
+    return execute_sqlmodel_query(query_func)
 
 
-async def db_get_order(
-        order_id,
-        session: AsyncSession
-) -> Order:
-    query = select(Order).where(
-        Order.id == order_id,
+def db_get_order(order_id) -> Order:
+    def query_func(session):
+        query = select(Order).where(Order.id == order_id)
+        result = session.exec(query)
+        return result.one_or_none()
+
+    return execute_sqlmodel_query_single(query_func)
+
+
+def db_get_order_binance_id(order_binance_id) -> Order:
+    def query_func(session):
+        try:
+            query = select(Order).options(joinedload(Order.webhook)).where(Order.binance_id == order_binance_id)
+            result = session.exec(query)
+            return result.unique().one()
+        except Exception as e:
+            print(f"no order in db {order_binance_id}")
+            logging.error(f"Error: {e}")
+            return None
+
+    return execute_sqlmodel_query_single(query_func)
+
+
+def db_get_all_order(webhook_id, order_status: OrderStatus, order_type: OrderType) -> list:
+    def query_func(session):
+        query = select(Order).where(
+            Order.webhook_id == webhook_id,
+            Order.status == order_status,
+            Order.type == order_type
+        ).order_by(Order.id.desc())
+
+        result = session.exec(query)
+        return result.all()
+
+    return execute_sqlmodel_query(query_func)
+
+
+def get_next_order(symbol: str) -> Order:
+    def query_func(session):
+        query = select(Order).where(Order.symbol == symbol, Order.status == OrderStatus.NEW).order_by(Order.order_number)
+        result = session.exec(query)
+        next_order = result.first()
+        if next_order:
+            next_order.status = OrderStatus.IN_PROGRESS
+            session.commit()
+        return next_order
+
+    return execute_sqlmodel_query_single(query_func)
+
+
+def main():
+    order = db_get_order_binance_id(1594495326)
+    webhook = order.webhook
+
+    payload = WebhookPayload(
+        name=webhook.name,
+        side=order.side,
+        positionSide=order.position_side,
+        symbol=order.symbol,
+        open=webhook.open,
+        settings=webhook.settings
     )
 
-    result = await session.exec(query)
-    return result.one_or_none()
-
-
-async def db_get_order_binance_id(
-        order_binance_id,
-        session: AsyncSession
-) -> Order:
-    try:
-        query = select(Order).options(joinedload(Order.webhook)).where(Order.binance_id == order_binance_id)
-
-        result = await session.exec(query)
-        return result.unique().one()
-    except Exception as e:
-        print(f"no order in db {order_binance_id}")
-        logging.error(f"Error: {e}")
-        return None
-
-
-async def db_get_all_order(
-        webhook_id,
-        order_status: OrderStatus,
-        order_type: OrderType,
-        session: AsyncSession,
-):
-    """
-    Load all orders by webhook
-    """
-    query = select(Order).where(
-        Order.webhook_id == webhook_id,
-        Order.status == order_status,
-        Order.type == order_type
-    ).order_by(Order.id.desc())
-
-    result = await session.exec(query)
-    return result.all()
-
-
-async def get_next_order(session: AsyncSession, symbol: str):
-    """
-    Get the next order for a given symbol that is not yet processed.
-    """
-    query = select(Order).where(Order.symbol == symbol, Order.status == OrderStatus.NEW).order_by(Order.order_number)
-    result = await session.exec(query)
-    next_order = result.first()
-    if next_order:
-        next_order.status = OrderStatus.IN_PROGRESS
-        await session.commit()
-    return next_order
-
-
-async def main():
-    async with AsyncSession(async_engine) as session:
-        order = await db_get_order_binance_id(1594495326, session)
-        webhook = order.webhook
-
-        payload = WebhookPayload(
-            name=webhook.name,
-            side=order.side,
-            positionSide=order.position_side,
-            symbol=order.symbol,
-            open=webhook.open,
-            settings=webhook.settings
-        )
-
-        print(payload.model_dump())
+    print(payload.model_dump())
 
 
 if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(main())
+    main()

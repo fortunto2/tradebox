@@ -1,5 +1,7 @@
 import asyncio
+from datetime import time
 from functools import lru_cache
+from time import sleep
 from typing import List
 
 from binance.um_futures import UMFutures
@@ -74,7 +76,7 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
     return quantity, price
 
 
-async def create_order_binance(order: Order):
+def create_order_binance(order: Order):
     """
     https://binance-docs.github.io/apidocs/futures/en/#new-order-trade
 
@@ -114,7 +116,7 @@ async def create_order_binance(order: Order):
     #     raise HTTPException(status_code=500, detail="Failed to create order")
 
 
-async def cancel_order_binance(symbol, order_id):
+def cancel_order_binance(symbol, order_id):
     """
     https://binance-docs.github.io/apidocs/futures/en/#cancel-order-trade
 
@@ -127,7 +129,7 @@ async def cancel_order_binance(symbol, order_id):
     return response
 
 
-async def wait_order(symbol):
+def wait_order(symbol):
     """
     Monitor an order status by its ID.
 
@@ -155,7 +157,7 @@ async def wait_order(symbol):
     return None
 
 
-async def check_position_side_dual() -> bool:
+def check_position_side_dual() -> bool:
     try:
         dual_side_position = client.get_position_mode()
 
@@ -172,8 +174,7 @@ async def check_position_side_dual() -> bool:
                 logging.error(f"Не получилось сменить позицию, проверье настройки Binance!: {r}")
                 return False
 
-            # sleep1
-            await asyncio.sleep(1)
+            sleep(1)
             dual_side_position = client.get_position_mode()
             logging.info(f"Position side dual: {dual_side_position}")
 
@@ -184,7 +185,7 @@ async def check_position_side_dual() -> bool:
         raise HTTPException(status_code=500, detail="Failed to get position side dual")
 
 
-async def check_position(symbol: str) -> (LongPosition, ShortPosition):
+def check_position(symbol: str) -> (LongPosition, ShortPosition):
     "GET /fapi/v2/positionRisk"
     """
     https://binance-docs.github.io/apidocs/futures/en/#position-information-v2-user_data
@@ -203,11 +204,11 @@ async def check_position(symbol: str) -> (LongPosition, ShortPosition):
     return None, None
 
 
-async def get_order_id(symbol, order_id):
+def get_order_id(symbol, order_id):
     order = client.query_order(symbol=symbol, orderId=order_id)
     return order
 
-async def wait_order_id(symbol, order_id):
+def wait_order_id(symbol, order_id):
     print(f"Monitoring order {symbol}: {order_id}")
     with tqdm(desc="Checking order status", unit="check", position=0, leave=True) as pbar:
 
@@ -221,10 +222,10 @@ async def wait_order_id(symbol, order_id):
                 logging.info(f"Order {order_id} is {order['status']}")
                 pbar.close()  # Close the progress bar when the condition is met
                 return order
-            await asyncio.sleep(1)  # Adjust the sleep interval as needed.
+            sleep(1)  # Adjust the sleep interval as needed.
 
 
-async def check_all_orders(symbol: str, orderId: int = None):
+def check_all_orders(symbol: str, orderId: int = None):
     """
     Monitor all  orders.
 
@@ -241,7 +242,7 @@ async def check_all_orders(symbol: str, orderId: int = None):
         return None
 
 
-async def check_open_orders(symbol: str):
+def check_open_orders(symbol: str):
     """
     Monitor all open orders.
 

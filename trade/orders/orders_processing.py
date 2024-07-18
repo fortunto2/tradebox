@@ -2,39 +2,32 @@ import time
 from decimal import Decimal
 from typing import List
 
-from sqlmodel.ext.asyncio.session import AsyncSession
-
 from core.binance_futures import get_position_closed_pnl, check_position, check_all_orders, wait_order_id
-from core.db_async import async_engine
 from core.models.orders import OrderType, OrderStatus, OrderPositionSide, OrderSide, OrderBinanceStatus, Order
-from core.models.webhook import WebHook
-from core.schemas.position import ShortPosition
-
 from core.schemas.webhook import WebhookPayload
-from core.views.handle_orders import db_get_last_order, db_get_orders, get_webhook
+from core.views.handle_orders import db_get_last_order, db_get_orders
 from trade.orders.grid import update_grid
-from trade.orders.orders_create import create_long_market_order, \
-    create_long_tp_order, create_long_limit_order, create_short_stop_order
+from trade.orders.orders_create import create_long_market_order, create_long_tp_order, create_long_limit_order, create_short_stop_order
+from core.db_sync import execute_sqlmodel_query, execute_sqlmodel_query_single
 
 
-async def open_long_position(payload: WebhookPayload, webhook_id, session: AsyncSession):
-    # todo check in db first
-    first_order = await create_long_market_order(
+def open_long_position(payload: WebhookPayload, webhook_id):
+    first_order = create_long_market_order(
         symbol=payload.symbol,
         quantity=payload.open.amount,
         leverage=payload.open.leverage,
         webhook_id=webhook_id,
     )
 
-    tp_order = await create_long_tp_order(
+    tp_order = create_long_tp_order(
         symbol=payload.symbol,
         tp=payload.settings.tp,
         leverage=payload.open.leverage,
         webhook_id=webhook_id,
     )
 
-    # первый запуск создание пары ордеров лимитных по сетки
-    await grid_make_long_limit_order(
+    # первый запуск создание пары ордеров лимитных по сетке
+    grid_make_long_limit_order(
         webhook_id=webhook_id,
         payload=payload,
     )
@@ -42,10 +35,9 @@ async def open_long_position(payload: WebhookPayload, webhook_id, session: Async
     return
 
 
-async def open_short_position_loop(
+def open_short_position_loop(
         payload: WebhookPayload,
         webhook_id,
-        session: AsyncSession,
         order_binance_id: int,
 ):
     extramarg = Decimal(payload.settings.extramarg)
@@ -58,62 +50,33 @@ async def open_short_position_loop(
     extramarg = Decimal(payload.settings.extramarg) + pnl
 
     if extramarg * Decimal(payload.open.leverage) < 11:
-        #  проверку что не extramarg не должен быть менее 11 долларов * плече
+        # проверку что не extramarg не должен быть менее 11 долларов * плече
         print("Not enough money")
         return
 
-    # _, position_short = await check_position(symbol=payload.symbol)
-    # position_short: ShortPosition
-
-    short_order: Order = await db_get_last_order(webhook_id, session, OrderType.SHORT_LIMIT, order_by='ask')
+    short_order: Order = execute_sqlmodel_query_single(lambda session: db_get_last_order(webhook_id, order_type=OrderType.SHORT_LIMIT, order_by='ask'))
 
     hedge_price = Decimal(short_order.price) * (1 - Decimal(payload.settings.offset_pluse) / 100)
 
     quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
 
     # только один раз, когда хватает денег
-    hedge_stop_order = await create_short_stop_order(
+    hedge_stop_order = create_short_stop_order(
         symbol=payload.symbol,
         price=hedge_price,
         quantity=quantity,
         leverage=payload.open.leverage,
         webhook_id=webhook_id,
-        session=session,
     )
 
     return hedge_stop_order.binance_id
 
 
-#
-# async def get_market_orders(payload: WebhookPayload, webhook_id, session: AsyncSession):
-#     order_binance_id = None
-#     if webhook_id:
-#         order = await db_get_last_order(webhook_id, session, OrderType.MARKET)
-#         order_binance_id = order.binance_id
-#
-#     orders: List[dict] = await check_all_orders(
-#         symbol=payload.symbol,
-#         orderId=order_binance_id
-#     )
-#
-#     limit_orders = []
-#     for order in orders:
-#         # select just  (LONG-BUY-LIMIT)
-#         if order["type"] == "LIMIT" and order["side"] == "BUY" and order["positionSide"] == "LONG":
-#             limit_orders.append(order)
-#
-#     print(limit_orders)
-#
-#     return limit_orders
-
-
-async def get_grid_orders(
+def get_grid_orders(
         symbol: str,
         status: OrderStatus = OrderStatus.FILLED,
         webhook_id=None,
-        session: AsyncSession = None,
-
-):
+) -> List[Order]:
     """
     Ищем в базе все ордера которые уже исполнились из сетки и сверяем статусы с бинанс.
 
@@ -124,122 +87,93 @@ async def get_grid_orders(
     :param symbol:
     :param status:
     :param webhook_id:
-    :param session:
     :return:
     """
-    if webhook_id:
-        orders = await db_get_orders(
-            webhook_id=webhook_id,
-            order_status=status,
-            position_side=OrderPositionSide.LONG,
-            order_type=OrderType.LONG_LIMIT,
-            order_side=OrderSide.BUY,
-            session=session
-        )
-    else:
-        orders = await db_get_orders(
-            order_status=status,
-            position_side=OrderPositionSide.LONG,
-            order_type=OrderType.LONG_LIMIT,
-            order_side=OrderSide.BUY,
-            session=session
-        )
+    def get_orders(session):
+        if webhook_id:
+            orders = db_get_orders(
+                webhook_id=webhook_id,
+                order_status=status,
+                position_side=OrderPositionSide.LONG,
+                order_type=OrderType.LONG_LIMIT,
+                order_side=OrderSide.BUY,
+            )
+        else:
+            orders = db_get_orders(
+                order_status=status,
+                position_side=OrderPositionSide.LONG,
+                order_type=OrderType.LONG_LIMIT,
+                order_side=OrderSide.BUY,
+            )
+        return orders
 
-    limit_orders = []
-
-    # order_binance: List[dict] = await check_all_orders(
-    #     symbol=symbol,
-    #     orderId=orders[0].binance_id
-    # )
-    # filter by status Filled
-    # order_binance_filled = [order for order in order_binance if order["status"] == "FILLED"]
-
-    # for order_bi in order_binance:
-    #
-    #     # load from enum OrderStatus
-    #     order_binance_status = OrderBinanceStatus(order_bi["status"])
-    #
-    #     if order_binance_status == order.binance_status:
-    #         limit_orders.append(order)
-    #     else:
-    #         order.binance_status = order_binance_status
-    #         # select from order_binance["status"]
-    #         order.status = OrderStatus(order_bi["status"])
-
-    return orders
+    return execute_sqlmodel_query(get_orders)
 
 
-async def check_orders_in_the_grid(payload: WebhookPayload, webhook_id, session: AsyncSession = None):
-    async with AsyncSession(async_engine) as session:
-        grid_orders = await update_grid(payload, webhook_id, session)
+def check_orders_in_the_grid(payload: WebhookPayload, webhook_id):
+    def check_orders(session):
+        grid_orders = update_grid(payload, webhook_id)
 
         grid = list(zip(grid_orders["long_orders"], grid_orders["martingale_orders"]))
         print(f"grid_orders: {len(grid)}")
 
-        # ищем уже созданные в базе выполненные ордера
-        filled_orders = await get_grid_orders(
+        filled_orders = get_grid_orders(
             symbol=payload.symbol,
             status=OrderStatus.FILLED,
             webhook_id=webhook_id,
-            session=session)
+        )
 
         print(f"filled_orders: {len(filled_orders)}")
 
         return filled_orders, grid_orders, grid
 
+    return execute_sqlmodel_query(check_orders)
 
-async def grid_make_long_limit_order(
+
+def grid_make_long_limit_order(
         webhook_id,
-        payload: WebhookPayload,
-        session: AsyncSession = None):
+        payload: WebhookPayload):
     """
-
     :param payload:
     :param webhook_id:
-    :param session:
     :return: Вернет True если есть еще ордера в сетке, False если последний ордер
     """
-
-    async with AsyncSession(async_engine) as session:
-
+    def create_limit_order(session):
         if not payload:
             print("payload not found, webhook_id:", webhook_id)
             return False
 
-        filled_orders, grid_orders, grid = await check_orders_in_the_grid(payload, webhook_id)
+        filled_orders, grid_orders, grid = check_orders_in_the_grid(payload, webhook_id)
 
         price, quantity = grid[len(filled_orders)]
 
-        limit_order = await create_long_limit_order(
+        limit_order = create_long_limit_order(
             symbol=payload.symbol,
             price=price,
             quantity=quantity,
             leverage=payload.open.leverage,
             webhook_id=webhook_id,
-            session=session,
         )
 
         if len(filled_orders) == len(grid) - 1:
-            # предпоследний ордер запускается вместе с хедж шорт
-            # todo: только один раз, когда хватает денег
-
             short_order_price = Decimal(price) * Decimal(1 - payload.settings.offset_short / 100)
             short_order_amount = Decimal(payload.settings.extramarg * payload.open.leverage) / short_order_price
 
             time.sleep(0.5)
 
-            await create_short_stop_order(
+            create_short_stop_order(
                 symbol=payload.symbol,
                 price=short_order_price,
                 quantity=short_order_amount,
                 leverage=payload.open.leverage,
                 webhook_id=webhook_id,
-                session=session,
             )
 
-        await session.commit()
+        session.commit()
 
         return True
+
+    return execute_sqlmodel_query(create_limit_order)
 
 
 def wait_limit_order_filled(symbol, order_id):
@@ -249,12 +183,10 @@ def wait_limit_order_filled(symbol, order_id):
     )
 
 
-async def main():
-    async with AsyncSession(async_engine) as session:
-        orders = await get_grid_orders("JOEUSDT", OrderStatus.FILLED, 7, session)
+def main():
+    orders = get_grid_orders("JOEUSDT", OrderStatus.FILLED, 7)
+    print(orders)
 
 
 if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(main())
+    main()

@@ -10,7 +10,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 sys.path.append('..')
 sys.path.append('../core')
 
-from core.db_async import async_engine
 
 from core.schemas.webhook import WebhookPayload
 from trade.orders.orders_processing import open_long_position

@@ -1,7 +1,13 @@
+import asyncio
+
 from fastapi import FastAPI, HTTPException, Depends
 import logging
 
 import sentry_sdk
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from core._db_async import get_async_session
+from core.db_sync import get_db_session, SessionLocal, sync_engine
 
 sentry_sdk.init(
     dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
@@ -14,8 +20,7 @@ sentry_sdk.init(
     profiles_sample_rate=1.0,
 )
 
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import SQLModel
+from sqlmodel import SQLModel, Session
 
 from core.binance_futures import check_position_side_dual, check_position
 from core.models.orders import Order
@@ -28,7 +33,6 @@ from core.tg_client import TelegramClient
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
-from core.db_async import async_engine, get_async_session
 
 import logging
 
@@ -39,7 +43,7 @@ from fastapi.exceptions import RequestValidationError
 
 from sqladmin import Admin, ModelView
 
-admin = Admin(app, async_engine, base_url="/rust_admin")
+admin = Admin(app, engine=sync_engine, base_url="/rust_admin")
 
 
 class WebhooksAdmin(ModelView, model=WebHook):
@@ -102,11 +106,11 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 async def on_startup():
-    async with async_engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
+    # with SessionLocal as conn:
+    #     SQLModel.metadata.create_all()
 
     #     check dual mode
-    dual_mode = await check_position_side_dual()
+    dual_mode = check_position_side_dual()
     if not dual_mode:
         raise HTTPException(status_code=403, detail="Failed to set dual mode, check Binance settings!")
 
@@ -125,7 +129,7 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     # todo: check if position already exists in db
     # если слишком быстро пришло много вебхуков на один символ, все отработают
 
-    position_long, _ = await check_position(symbol=symbol)
+    position_long, _ = check_position(symbol=symbol)
     position_long: LongPosition
 
     if float(position_long.entryPrice) > 0:
@@ -153,7 +157,10 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     # current_price = get_current_price(symbol)
     # logging.info(f"Current price for {symbol}: {current_price}")
 
-    await open_long_position(body, webhook.id, session)
+    # async to thread run
+    await asyncio.to_thread(open_long_position, body, webhook.id)
+    await session.close()
+
     # tg.send_message(message=first_order.model_dump_json())
 
     return {"status": "success"}

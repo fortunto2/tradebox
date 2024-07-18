@@ -1,50 +1,32 @@
-import asyncio
 from decimal import Decimal
 import sys
 from pprint import pprint
-
-from core.db_async import async_engine
-
-sys.path.append('../../core')
-sys.path.append('')
-
-from core.views.handle_orders import db_get_all_order
-
-from sqlmodel.ext.asyncio.session import AsyncSession
+import time
 
 from core.schemas.position import LongPosition, ShortPosition
 from core.binance_futures import create_order_binance, check_position, get_order_id, cancel_order_binance
 from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide, OrderStatus, OrderBinanceStatus
+from core.views.handle_orders import db_get_all_order
+from core.db_sync import execute_sqlmodel_query, execute_sqlmodel_query_single
+
+sys.path.append('../../core')
+sys.path.append('')
 
 
-async def create_long_market_order(
+def create_long_market_order(
         symbol: str,
         quantity: Decimal,
         leverage: int,
         webhook_id,
-        side: OrderSide = OrderSide.BUY,
-        session: AsyncSession = None,
+        side: OrderSide = OrderSide.BUY
 ) -> Order:
-    """
-    (LONG-BUY-MARKET) - стартовый лонг.
-    Создание маркет ордера в самом начале когда пришел вебхук и открыли позицию
-    :param side:
-    :param symbol:
-    :param quantity:
-    :param leverage:
-    :param webhook_id:
-    :param session:
-    :return:
-    """
     print("Market order LONG:")
 
-    async with AsyncSession(async_engine) as session:
-
+    def create_order(session):
         market_order = Order(
             position_side=OrderPositionSide.LONG,
             side=side,
             type=OrderType.LONG_MARKET,
-
             symbol=symbol,
             quantity=quantity,
             leverage=leverage,
@@ -52,341 +34,246 @@ async def create_long_market_order(
             order_number=0
         )
 
-        order_binance_id = await create_order_binance(market_order)
+        order_binance_id = create_order_binance(market_order)
         market_order.binance_id = order_binance_id
 
-        position_long, _ = await check_position(symbol=symbol)
+        # убрать отсюад, в вебсокеты
+        position_long, _ = check_position(symbol=symbol)
         position_long: LongPosition
 
         if position_long:
             market_order.price = position_long.entryPrice
             market_order.status = OrderStatus.FILLED
 
-        # while not Filled
-        order = {'status': 'NEW'}
-        timer = 0
-
-        # while order['status'] != 'FILLED' or timer < 30:
-        #     try:
-        #         order = await get_order_id(symbol, order_binance_id)
-        #     except Exception as e:
-        #         timer += 1
-        #         print(e)
-        #         await asyncio.sleep(1)
-
         market_order.binance_status = OrderBinanceStatus.FILLED
 
         pprint(market_order.model_dump())
-        async with AsyncSession(async_engine) as session:
-            session.add(market_order)
-            await session.commit()
-
+        session.add(market_order)
+        session.commit()
         return market_order
 
+    return execute_sqlmodel_query_single(create_order)
 
-async def create_short_market_order(
+
+def create_short_market_order(
         symbol: str,
         quantity: Decimal,
         leverage: int,
         webhook_id,
-        side: OrderSide = OrderSide.BUY,
-        session: AsyncSession = None
+        side: OrderSide = OrderSide.BUY
 ) -> Order:
-    """
-    (SHORT-BUY-MARKET) - вконце для закрытия
-    :param side:
-    :param symbol:
-    :param quantity:
-    :param leverage:
-    :param webhook_id:
-    :param session:
-    :return:
-    """
     print("Market order SHORT:")
 
-    market_order = Order(
-        position_side=OrderPositionSide.SHORT,
-        side=side,
-        type=OrderType.SHORT_MARKET,
 
-        symbol=symbol,
-        quantity=quantity,
-        leverage=leverage,
-        webhook_id=webhook_id,
-        order_number=0
-    )
+    def create_order(session):
+        market_order = Order(
+            position_side=OrderPositionSide.SHORT,
+            side=side,
+            type=OrderType.SHORT_MARKET,
+            symbol=symbol,
+            quantity=quantity,
+            leverage=leverage,
+            webhook_id=webhook_id,
+            order_number=0
+        )
 
-    order_binance_id = await create_order_binance(market_order)
-    market_order.binance_id = order_binance_id
+        order_binance_id = create_order_binance(market_order)
+        market_order.binance_id = order_binance_id
 
-    _, position_short = await check_position(symbol=symbol)
-    position_short: ShortPosition
+        _, position_short = check_position(symbol=symbol)
+        position_short: ShortPosition
 
-    if position_short:
-        market_order.price = position_short.entryPrice
-        market_order.status = OrderStatus.FILLED
+        if position_short:
+            market_order.price = position_short.entryPrice
+            market_order.status = OrderStatus.FILLED
 
-    # while not Filled
-    order = {'status': 'NEW'}
-    timer = 0
-
-    while order['status'] != 'FILLED' or timer < 30:
-        try:
-            order = await get_order_id(symbol, order_binance_id)
-        except Exception as e:
-            timer += 1
-            print(e)
-            await asyncio.sleep(1)
         market_order.binance_status = OrderBinanceStatus.FILLED
 
-    pprint(market_order.model_dump())
-    async with AsyncSession(async_engine) as session:
+        pprint(market_order.model_dump())
         session.add(market_order)
-        await session.commit()
+        session.commit()
+        return market_order
 
-    return market_order
+    return execute_sqlmodel_query_single(create_order)
 
 
-
-async def create_long_tp_order(
+def create_long_tp_order(
         symbol: str,
         tp: Decimal,
         leverage: int,
-        webhook_id,
-        session: AsyncSession = None
+        webhook_id
 ) -> Order:
-    """
-    (LONG-SELL-TAKE_PROFIT[LIMIT] ) - сверху.
-    Создание тейк профит ордера, он постоянно передвигается после
-    обновления сетки и создания новых лимитных ордеров.
+    print("Take profit order:")
 
-    Если он сработал, то позицию поидее закрываем.
-    Забирем прибыль
-
-    :param symbol:
-    :param tp:
-    :param leverage:
-    :param webhook_id:
-    :param session:
-    :return:
-    """
-    print("Take proffit order:")
-
-    async with AsyncSession(async_engine) as session:
-
-        # remove old tp orders
-        orders = await db_get_all_order(webhook_id, OrderStatus.IN_PROGRESS, OrderType.LONG_TAKE_PROFIT, session)
+    def create_order(session):
+        orders = db_get_all_order(webhook_id, OrderStatus.IN_PROGRESS, OrderType.LONG_TAKE_PROFIT)
         for order in orders:
             try:
-                result = await cancel_order_binance(symbol, order.binance_id)
+                result = cancel_order_binance(symbol, order.binance_id)
                 if result['status'] == 'CANCELED':
                     order.status = OrderStatus.CANCELED
                     session.add(order)
             except Exception as e:
                 print(e)
 
-        position_long, _ = await check_position(symbol=symbol)
+        position_long, _ = check_position(symbol=symbol)
         position_long: LongPosition
 
         tp_price = Decimal(position_long.breakEvenPrice) * (1 + Decimal(tp) / 100)
 
-        # любое измение позиции, если поменялась что нибудь, берем из позиции новый обьем и цену.
-        take_proffit_order = Order(
+        take_profit_order = Order(
             position_side=OrderPositionSide.LONG,
             side=OrderSide.SELL,
             type=OrderType.LONG_TAKE_PROFIT,
-
             symbol=symbol,
             quantity=position_long.positionAmt,
             leverage=leverage,
             webhook_id=webhook_id,
             price=tp_price
         )
-        # старый надо отменить, запоминать старый.
 
-        take_proffit_order.binance_id = await create_order_binance(take_proffit_order)
-        take_proffit_order.status = OrderStatus.IN_PROGRESS
+        take_profit_order.binance_id = create_order_binance(take_profit_order)
+        take_profit_order.status = OrderStatus.IN_PROGRESS
 
-        pprint(take_proffit_order.model_dump())
+        pprint(take_profit_order.model_dump())
+        session.add(take_profit_order)
+        session.commit()
+        return take_profit_order
 
-        session.add(take_proffit_order)
-        await session.commit()
-
-    return take_proffit_order
+    return execute_sqlmodel_query_single(create_order)
 
 
-async def create_long_limit_order(
+def create_long_limit_order(
         symbol: str,
         price: Decimal,
         quantity: Decimal,
         leverage: int,
-        webhook_id,
-        session: AsyncSession,
+        webhook_id
 ) -> Order:
-    """
-    (LONG-BUY-LIMIT) - снизу.
-    Усредняющие ордера которые постоянно на покупку снизу.
-    :param symbol:
-    :param price:
-    :param quantity:
-    :param leverage:
-    :param webhook_id:
-    :param session:
-    :return:
-    """
     print("LONG-BUY-LIMIT order:")
 
-    limit_order = Order(
-        position_side=OrderPositionSide.LONG,
-        side=OrderSide.BUY,
-        type=OrderType.LONG_LIMIT,
+    def create_order(session):
+        limit_order = Order(
+            position_side=OrderPositionSide.LONG,
+            side=OrderSide.BUY,
+            type=OrderType.LONG_LIMIT,
+            symbol=symbol,
+            price=price,
+            quantity=quantity,
+            leverage=leverage,
+            webhook_id=webhook_id,
+        )
+        limit_order.binance_id = create_order_binance(limit_order)
+        limit_order.status = OrderStatus.IN_PROGRESS
 
-        symbol=symbol,
-        price=price,
-        quantity=quantity,
-        leverage=leverage,
-        webhook_id=webhook_id,
-    )
-    limit_order.binance_id = await create_order_binance(limit_order)
-    limit_order.status = OrderStatus.IN_PROGRESS
+        pprint(limit_order.model_dump())
 
-    pprint(limit_order.model_dump())
-
-    async with AsyncSession(async_engine) as session:
         session.add(limit_order)
-        await session.commit()
+        session.commit()
+        return limit_order
 
-    return limit_order
+    return execute_sqlmodel_query_single(create_order)
 
 
-async def create_short_stop_order(
+def create_short_stop_order(
         symbol: str,
         price: Decimal,
         quantity: Decimal,
         leverage: int,
-        webhook_id,
-        session: AsyncSession
+        webhook_id
 ) -> Order:
-    """
-    (SHORT-SELL) - ограничивающий стоп-ордер.
-    Этот тип ордера используется для установки предела убытка, предотвращая дальнейшие потери.
-    :param symbol: Тикер символа
-    :param price: Цена, по которой будет активирован стоп-ордер
-    :param quantity: Количество, которое нужно продать или купить
-    :param leverage: Плечо
-    :param webhook_id: Идентификатор вебхука
-    :param session: Сессия базы данных
-    :return: Созданный ордер
-    """
     print("Creating SHORT STOP order:")
 
-    # Создание объекта ордера
-    order = Order(
-        position_side=OrderPositionSide.SHORT,
-        side=OrderSide.SELL,
-        type=OrderType.SHORT_LIMIT,
+    def create_order(session):
+        order = Order(
+            position_side=OrderPositionSide.SHORT,
+            side=OrderSide.SELL,
+            type=OrderType.SHORT_LIMIT,
+            symbol=symbol,
+            price=price,
+            quantity=quantity,
+            leverage=leverage,
+            webhook_id=webhook_id,
+        )
 
-        symbol=symbol,
-        price=price,
-        quantity=quantity,
-        leverage=leverage,
-        webhook_id=webhook_id,
-    )
+        order_binance = None
+        timer = 0
 
-    order_binance = None
-    timer = 0
-
-    while not order_binance or timer < 10:
-
-        order.binance_id = await create_order_binance(order)
+        order.binance_id = create_order_binance(order)
         order.status = OrderStatus.IN_PROGRESS
+
+        while not order_binance or timer < 10:
+
+            try:
+                order_binance = get_order_id(symbol, order.binance_id)
+                order.binance_status = order_binance['status']
+            except Exception as e:
+                print(e)
+                timer += 1
+
+            if not order_binance:
+                print('!!!!Order not found, retrying')
+                time.sleep(5)
+
         pprint(order.model_dump())
 
-        try:
-            order_binance = await get_order_id(symbol, order.binance_id)
-            order.binance_status = order_binance['status']
-        except Exception as e:
-            print(e)
-            timer += 1
-
-        if not order_binance:
-            print('!!!!Order not found, retrying')
-            await asyncio.sleep(5)
-
-    async with AsyncSession(async_engine) as session:
         session.add(order)
-        await session.commit()
+        session.commit()
+        return order
 
-    return order
+    return execute_sqlmodel_query_single(create_order)
 
 
-async def create_short_stop_loss_order(
+def create_short_stop_loss_order(
         symbol: str,
         sl_short: float,
         leverage: int,
-        webhook_id,
-        session: AsyncSession
+        webhook_id
 ) -> Order:
-    """
-    (SHORT-BUY) - сверху.
-    Чтобы когда цена пойдет вверх, он закрыл позицию.
-    Если пойдет еще выше цена, шорт будет в 2 раза будет больше чем лонговая.
-    Нам надо скинуть эту позицию чтобы дальше шла вверх.
-
-    :param price:
-    :param symbol:
-    :param sl_short: payload.settings.sl_short
-    :param quantity:
-    :param leverage:
-    :param webhook_id:
-    :param session:
-    :return:
-    """
     print("SHORT-BUY:")
 
-    _, position_short = await check_position(symbol=symbol)
-    position_short: ShortPosition
+    def create_order(session):
+        _, position_short = check_position(symbol=symbol)
+        position_short: ShortPosition
 
-    price = Decimal(position_short.entryPrice) * (1 + Decimal(sl_short) / 100)
-    quantity = abs(position_short.positionAmt)
-    print('price:', price)
-    print('quantity:', quantity)
+        price = Decimal(position_short.entryPrice) * (1 + Decimal(sl_short) / 100)
+        quantity = abs(position_short.positionAmt)
+        print('price:', price)
+        print('quantity:', quantity)
 
-    order = Order(
-        position_side=OrderPositionSide.SHORT,
-        side=OrderSide.BUY,
-        type=OrderType.SHORT_STOP_LOSS,
+        order = Order(
+            position_side=OrderPositionSide.SHORT,
+            side=OrderSide.BUY,
+            type=OrderType.SHORT_STOP_LOSS,
+            symbol=symbol,
+            price=price,
+            quantity=quantity,
+            leverage=leverage,
+            webhook_id=webhook_id,
+        )
 
-        symbol=symbol,
-        price=price,
-        quantity=quantity,
-        leverage=leverage,
-        webhook_id=webhook_id,
-    )
+        order_binance = None
+        timer = 0
 
-    # while not Filled
-    order_binance = None
-    timer = 0
-
-    while not order_binance or timer < 10:
-
-        order.binance_id = await create_order_binance(order)
+        order.binance_id = create_order_binance(order)
         order.status = OrderStatus.IN_PROGRESS
         pprint(order.model_dump())
 
-        try:
-            order_binance = await get_order_id(symbol, order.binance_id)
-            order.binance_status = order_binance['status']
-        except Exception as e:
-            print(e)
+        while not order_binance or timer < 10:
 
-        if not order_binance:
-            print('!!!!Order not found, retrying')
-            await asyncio.sleep(5)
-            timer += 1
+            try:
+                order_binance = get_order_id(symbol, order.binance_id)
+                order.binance_status = order_binance['status']
+            except Exception as e:
+                print(e)
 
-    async with AsyncSession(async_engine) as session:
+            if not order_binance:
+                print('!!!!Order not found, retrying')
+                time.sleep(5)
+                timer += 1
+
         session.add(order)
-        await session.commit()
+        session.commit()
+        return order
 
-    return order
+    return execute_sqlmodel_query_single(create_order)

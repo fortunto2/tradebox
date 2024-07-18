@@ -17,7 +17,7 @@ sqlmodel = "^0.0.19"
 aiosqlite = "^0.20.0"
 greenlet = "^3.0.3"
 asyncio = "^3.4.3"
-prefect = "^2.19.6"
+#prefect = "^2.19.6"
 tqdm = "^4.66.4"
 streamlit = "^1.36.0"
 sqladmin = "^0.18.0"
@@ -25,6 +25,7 @@ click = "^8.1.7"
 alembic = "^1.13.2"
 asyncpg = "^0.29.0"
 sentry-sdk = { extras = ["fastapi"], version = "^2.10" }
+psycopg2 = "^2.9.9"
 
 
 

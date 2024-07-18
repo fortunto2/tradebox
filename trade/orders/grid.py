@@ -2,17 +2,13 @@ import json
 from decimal import Decimal
 import sys
 
-from sqlmodel.ext.asyncio.session import AsyncSession
 
-from core.db_async import async_engine
 from core.models.orders import OrderType
 from core.views.handle_orders import db_get_last_order
 
 sys.path.append('../../core')
 sys.path.append('')
 
-from core.binance_futures import check_position
-from core.schemas.position import LongPosition, ShortPosition
 from core.schemas.webhook import WebhookPayload
 
 
@@ -91,14 +87,13 @@ def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal, fee_p
     return result
 
 
-async def update_grid(
+def update_grid(
         payload: WebhookPayload,
         webhook_id: int,
-        session: AsyncSession
 ):
 
-    order_market = await db_get_last_order(
-        webhook_id=webhook_id, session=session, order_type=OrderType.LONG_MARKET
+    order_market = db_get_last_order(
+        webhook_id=webhook_id, order_type=OrderType.LONG_MARKET
     )
 
     if order_market is None:
