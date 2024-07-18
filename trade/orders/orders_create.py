@@ -1,7 +1,10 @@
+import logging
 from decimal import Decimal
 import sys
 from pprint import pprint
 import time
+
+from binance.error import ClientError
 
 from core.schemas.position import LongPosition, ShortPosition
 from core.binance_futures import create_order_binance, check_position, get_order_id, cancel_order_binance
@@ -55,17 +58,16 @@ def create_long_market_order(
     return execute_sqlmodel_query_single(create_order)
 
 
-def create_short_market_order(
-        symbol: str,
-        quantity: Decimal,
-        leverage: int,
-        webhook_id,
-        side: OrderSide = OrderSide.BUY
-) -> Order:
-    print("Market order SHORT:")
-
-
+def create_short_market_order(symbol: str, quantity: Decimal, leverage: int, webhook_id,
+                              side: OrderSide = OrderSide.SELL):
     def create_order(session):
+        # Check existing position
+        _, position_short = check_position(symbol=symbol)
+
+        if not position_short or position_short.positionAmt == 0:
+            logging.error(f"No open short position to reduce for symbol: {symbol}")
+            return None
+
         market_order = Order(
             position_side=OrderPositionSide.SHORT,
             side=side,
@@ -77,25 +79,26 @@ def create_short_market_order(
             order_number=0
         )
 
-        order_binance_id = create_order_binance(market_order)
-        market_order.binance_id = order_binance_id
+        try:
+            order_binance_id = create_order_binance(market_order)
+            market_order.binance_id = order_binance_id
 
-        _, position_short = check_position(symbol=symbol)
-        position_short: ShortPosition
+            if position_short:
+                market_order.price = position_short.entryPrice
+                market_order.status = OrderStatus.FILLED
 
-        if position_short:
-            market_order.price = position_short.entryPrice
-            market_order.status = OrderStatus.FILLED
-
-        market_order.binance_status = OrderBinanceStatus.FILLED
-
-        pprint(market_order.model_dump())
-        session.add(market_order)
-        session.commit()
-        return market_order
+            market_order.binance_status = OrderBinanceStatus.FILLED
+            session.add(market_order)
+            session.commit()
+            return market_order
+        except ClientError as e:
+            if e.code == -2022:
+                logging.error("ReduceOnly Order is rejected.")
+            else:
+                logging.error(f"Error creating order: {e}")
+            return None
 
     return execute_sqlmodel_query_single(create_order)
-
 
 def create_long_tp_order(
         symbol: str,
