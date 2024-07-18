@@ -25,9 +25,6 @@ sync_engine = create_engine(
     echo=settings.DEBUG,
     future=True,
     json_serializer=pydantic_serializer,
-    connect_args={
-        'timeout': 15,
-    }
 )
 
 
