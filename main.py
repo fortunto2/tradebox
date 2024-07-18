@@ -65,9 +65,9 @@ class OrdersAdmin(ModelView, model=Order):
     can_edit = False
     can_delete = False
     column_list = [Order.id, Order.binance_id, Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status, Order.type, Order.created_at]
-    column_searchable_list = [Order.symbol, Order.webhook_id]
+    column_searchable_list = [Order.symbol, Order.webhook_id, Order.binance_id]
     column_sortable_list = [Order.id, Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status,
-                            Order.type, Order.created_at]
+                            Order.type, Order.created_at, Order.binance_id]
     column_formatters = {Order.symbol: lambda m, a: m.symbol[:10]}
     column_default_sort = [(Order.id, True), (Order.symbol, False)]
     column_filters = [Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status]
