@@ -129,7 +129,7 @@ class TradeMonitor:
                         return None
 
                     logger.info(f"Order status: {event.order_status}")
-                    order_binance_id = event.order_id
+                    order_binance_id = str(event.order_id)
                     logger.info(f"Order binance_id: {order_binance_id}")
 
                     timer = 0

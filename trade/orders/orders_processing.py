@@ -38,7 +38,7 @@ def open_long_position(payload: WebhookPayload, webhook_id):
 def open_short_position_loop(
         payload: WebhookPayload,
         webhook_id,
-        order_binance_id: int,
+        order_binance_id: str,
 ):
     extramarg = Decimal(payload.settings.extramarg)
 
