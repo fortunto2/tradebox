@@ -5,8 +5,6 @@ import sentry_sdk
 from decimal import Decimal
 
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
-from sqlalchemy.orm import sessionmaker
-from sqlmodel import create_engine, Session, select
 from config import get_settings
 from core.binance_futures import client, check_position, cancel_open_orders
 from core.logger import logger
@@ -20,7 +18,7 @@ from trade.orders.orders_create import create_short_stop_loss_order, create_long
     create_short_market_order, create_short_stop_order, create_long_tp_order
 from trade.orders.orders_processing import check_orders_in_the_grid, grid_make_long_limit_order, \
     open_short_position_loop
-from core.db_sync import execute_query, execute_query_single, execute_sqlmodel_query, execute_sqlmodel_query_single
+from core.db_sync import SessionLocal
 
 settings = get_settings()
 
@@ -30,11 +28,6 @@ sentry_sdk.init(
     traces_sample_rate=1.0,
     profiles_sample_rate=1.0,
 )
-
-# Create a synchronous SQLAlchemy engine
-DATABASE_URL = settings.DB_ASYNC_CONNECTION_STR
-engine = create_engine(DATABASE_URL, echo=settings.DEBUG, future=True)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 class TradeMonitor:
     def __init__(self, symbols):
