@@ -101,7 +101,6 @@ class TradeMonitor:
                             leverage=leverage,
                             webhook_id=webhook_id,
                             side=OrderSide.BUY,
-                            session=session
                         )
                         create_long_market_order(
                             symbol=event.symbol,
@@ -109,7 +108,6 @@ class TradeMonitor:
                             leverage=leverage,
                             webhook_id=webhook_id,
                             side=OrderSide.SELL,
-                            session=session
                         )
                     logger.info(f">>> Cancel all open orders: {status_cancel}")
         except Exception as e:
