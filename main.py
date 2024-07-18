@@ -64,7 +64,7 @@ class OrdersAdmin(ModelView, model=Order):
     can_create = False
     can_edit = False
     can_delete = False
-    column_list = [Order.id, Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status, Order.type, Order.created_at]
+    column_list = [Order.id, Order.binance_id, Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status, Order.type, Order.created_at]
     column_searchable_list = [Order.symbol, Order.webhook_id]
     column_sortable_list = [Order.id, Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status,
                             Order.type, Order.created_at]
