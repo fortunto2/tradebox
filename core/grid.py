@@ -2,6 +2,7 @@ import json
 from decimal import Decimal
 import sys
 
+from prefect import task
 
 from core.models.orders import OrderType
 from core.views.handle_orders import db_get_last_order
@@ -86,7 +87,7 @@ def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal, fee_p
 
     return result
 
-
+@task
 def update_grid(
         payload: WebhookPayload,
         webhook_id: int,
