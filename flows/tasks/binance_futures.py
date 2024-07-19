@@ -1,5 +1,5 @@
 import asyncio
-from datetime import time
+from datetime import time, timedelta
 from functools import lru_cache, cache
 from time import sleep
 from typing import List
@@ -9,13 +9,15 @@ import sys
 import logging
 
 from fastapi import HTTPException
+from prefect import task
+from prefect.tasks import task_input_hash
 from sqlmodel.ext.asyncio.session import AsyncSession
 from tqdm import tqdm
 
 from core.schemas.position import LongPosition, ShortPosition
 
-sys.path.append('..')
-sys.path.append('.')
+sys.path.append('../..')
+sys.path.append('../../core')
 from core.models.orders import Order, OrderType, OrderPositionSide
 
 from config import settings
@@ -30,7 +32,7 @@ client = UMFutures(key=settings.BINANCE_API_KEY, secret=settings.BINANCE_API_SEC
 # print(client.account())
 
 
-@cache
+@task(cache_key_fn=task_input_hash, cache_expiration=timedelta(days=1))
 def get_symbol_info(symbol):
     exchange_info = client.exchange_info()
     for s in exchange_info['symbols']:
@@ -46,7 +48,7 @@ def adjust_precision(value, precision):
     quantize_str = '1.' + '0' * precision if precision > 0 else '1'
     return value.quantize(Decimal(quantize_str), rounding=ROUND_DOWN)
 
-
+@task
 def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
     symbol_info = get_symbol_info(symbol)
     if not symbol_info:
@@ -75,6 +77,7 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
     return quantity, price
 
 
+@task
 def create_order_binance(order: Order):
     """
     https://binance-docs.github.io/apidocs/futures/en/#new-order-trade
@@ -115,6 +118,7 @@ def create_order_binance(order: Order):
     #     raise HTTPException(status_code=500, detail="Failed to create order")
 
 
+@task
 def cancel_order_binance(symbol, order_id):
     """
     https://binance-docs.github.io/apidocs/futures/en/#cancel-order-trade
@@ -126,34 +130,6 @@ def cancel_order_binance(symbol, order_id):
     response = client.cancel_order(symbol=symbol, orderId=order_id)
     logging.info(f"Order canceled successfully: {response}")
     return response
-
-
-def wait_order(symbol):
-    """
-    Monitor an order status by its ID.
-
-    Order Status
-        NEW
-        PARTIALLY_FILLED
-        FILLED
-        CANCELED
-        EXPIRED
-        EXPIRED_IN_MATCH
-
-    :param symbol: The symbol of the order to monitor.
-    :param order_id: The ID of the order to monitor.
-    :return: The order status.
-    """
-    try:
-        orders = client.get_orders(symbol=symbol)
-        if orders:
-            logging.info(f"Orders: {orders}")
-            return orders
-    except Exception as e:
-        logging.error(f"Failed to monitor order: {e}")
-        raise HTTPException(status_code=500, detail="Failed to monitor order")
-
-    return None
 
 
 def check_position_side_dual() -> bool:
@@ -184,6 +160,11 @@ def check_position_side_dual() -> bool:
         raise HTTPException(status_code=500, detail="Failed to get position side dual")
 
 
+# @task(
+#     name=f'check_position',
+#     retries=3,
+#     retry_delay_seconds=5
+# )
 def check_position(symbol: str) -> (LongPosition, ShortPosition):
     "GET /fapi/v2/positionRisk"
     """
@@ -203,27 +184,13 @@ def check_position(symbol: str) -> (LongPosition, ShortPosition):
     return None, None
 
 
+@task
 def get_order_id(symbol, order_id):
     order = client.query_order(symbol=symbol, orderId=order_id)
     return order
 
-def wait_order_id(symbol, order_id):
-    print(f"Monitoring order {symbol}: {order_id}")
-    with tqdm(desc="Checking order status", unit="check", position=0, leave=True) as pbar:
 
-        while True:
-            order = client.query_order(symbol=symbol, orderId=order_id)
-            # Update the description with the current status
-            pbar.set_description(f"Order {order_id} current status: {order['status']}")
-            pbar.update(1)
-
-            if order['status'] in ['FILLED', 'CANCELED', 'REJECTED']:
-                logging.info(f"Order {order_id} is {order['status']}")
-                pbar.close()  # Close the progress bar when the condition is met
-                return order
-            sleep(1)  # Adjust the sleep interval as needed.
-
-
+@task
 def check_all_orders(symbol: str, orderId: int = None):
     """
     Monitor all  orders.
@@ -241,28 +208,7 @@ def check_all_orders(symbol: str, orderId: int = None):
         return None
 
 
-def check_open_orders(symbol: str):
-    """
-    Monitor all open orders.
-
-    :param symbol: The symbol of the order to monitor.
-    :return: The order status.
-    """
-    try:
-        orders = client.get_orders(symbol=symbol)
-
-        if orders:
-            logging.info(f"Orders: {orders}")
-            return orders
-        else:
-            logging.info(f"No orders found")
-            return None
-
-    except Exception as e:
-        logging.error(f"Failed to monitor order: {e}")
-        raise HTTPException(status_code=500, detail="Failed to monitor order")
-
-
+@task
 def get_current_price(symbol: str) -> Decimal:
     try:
         ticker = client.ticker_price(symbol)
@@ -272,63 +218,14 @@ def get_current_price(symbol: str) -> Decimal:
         raise HTTPException(status_code=500, detail="Failed to get current price")
 
 
+@task
 def cancel_open_orders(symbol: str) -> dict:
     status = client.cancel_open_orders(symbol=symbol)
     print(f">>> Cancel all open orders: {status}")
     return status
 
 
-def cancel_open_orders_manual(symbol: str, order_id) -> dict:
-    # Получение всех активных ордеров
-    orders = client.get_open_orders(symbol=symbol)
-    for order in orders:
-        try:
-            # Отмена каждого ордера
-            result = client.cancel_order(symbol=symbol, orderId=order['orderId'])
-            print(f"Cancelled order ID: {order['orderId']}")
-        except Exception as e:
-            print(f"An error occurred while canceling the order {order['orderId']}: {e}")
-
-
-
-
+@task
 def get_position_closed_pnl(symbol: str, order_id: int) -> Decimal:
     orders = client.get_account_trades(symbol=symbol, orderId=order_id)
     return Decimal(orders[0].get('realizedPnl'))
-
-
-def on_message(ws, msg):
-    logging.info(f"Received message: {msg}")
-    if msg['e'] == 'ORDER_TRADE_UPDATE':
-        order_status = msg['o']['X']
-        logging.info(f"Order status: {order_status}")
-        if order_status in ['FILLED', 'CANCELED', 'REJECTED']:
-            logging.info(f"Order completed with status: {order_status}")
-
-
-def monitor_ws(symbol):
-    from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
-
-    listen_key = client.new_listen_key().get('listenKey')
-    ws_client = UMFuturesWebsocketClient(on_message=on_message)
-
-    # Подключаемся к WebSocket и подписываемся на данные пользователя
-    ws_client.user_data(
-        listen_key=listen_key,
-        symbol=symbol
-    )
-
-    # данные по цене
-    # ws_client.agg_trade(
-    #     symbol=symbol,
-    #     action=UMFuturesWebsocketClient.ACTION_SUBSCRIBE
-    #
-    # )
-
-
-if __name__ == "__main__":
-    # print(get_symbol_price_and_quantity_by_precisions("JOEUSDT", 0.0001))
-    # print(get_symbol_price_and_quantity_by_precisions("JOEUSDT", 0.00000001))
-    # print(get_symbol_price_and_quantity_by_precisions("JOEUSDT", 60))
-
-    monitor_ws("JOEUSDT")

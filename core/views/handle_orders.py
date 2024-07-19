@@ -1,11 +1,13 @@
 import logging
+
+from prefect import task
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
-from sqlmodel import select, Session
+from sqlmodel import select
 from core.models.orders import Order, OrderStatus, OrderType, OrderPositionSide, OrderSide
 from core.models.webhook import WebHook
 from core.schemas.webhook import WebhookPayload
-from core.db_sync import execute_sqlmodel_query, execute_sqlmodel_query_single
+from core.clients.db_sync import execute_sqlmodel_query, execute_sqlmodel_query_single
 
 
 def load_new_orders(symbol: str = None):
@@ -144,7 +146,7 @@ def db_get_order(order_id) -> Order:
 
     return execute_sqlmodel_query_single(query_func)
 
-
+@task
 def db_get_order_binance_id(order_binance_id) -> Order:
     def query_func(session):
         try:

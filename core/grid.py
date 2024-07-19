@@ -6,7 +6,7 @@ import sys
 from core.models.orders import OrderType
 from core.views.handle_orders import db_get_last_order
 
-sys.path.append('../../core')
+sys.path.append('')
 sys.path.append('')
 
 from core.schemas.webhook import WebhookPayload

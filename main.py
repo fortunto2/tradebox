@@ -1,13 +1,12 @@
-import asyncio
-
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, Depends
 import logging
 
 import sentry_sdk
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from core._db_async import get_async_session
-from core.db_sync import get_db_session, SessionLocal, sync_engine
+from core.clients.db_async import get_async_session
+from core.clients.db_sync import sync_engine
+from flows.open_long_potition import open_long_position
 
 sentry_sdk.init(
     dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
@@ -20,15 +19,12 @@ sentry_sdk.init(
     profiles_sample_rate=1.0,
 )
 
-from sqlmodel import SQLModel, Session
-
-from core.binance_futures import check_position_side_dual, check_position
+from flows.tasks.binance_futures import check_position_side_dual, check_position
 from core.models.orders import Order
 from core.schemas.position import LongPosition
-from trade.orders.orders_processing import open_long_position
 from core.models.webhook import WebHook
 from core.schemas.webhook import WebhookPayload
-from core.tg_client import TelegramClient
+from core.clients.tg_client import TelegramClient
 
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
@@ -38,7 +34,7 @@ import logging
 
 from starlette.responses import JSONResponse
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 
 from sqladmin import Admin, ModelView
@@ -158,7 +154,7 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     # logging.info(f"Current price for {symbol}: {current_price}")
 
     # async to thread run
-    await asyncio.to_thread(open_long_position, body, webhook.id)
+    await open_long_position(body, webhook.id)
     await session.close()
 
     # tg.send_message(message=first_order.model_dump_json())

@@ -5,8 +5,8 @@ from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClie
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from core.models.orders import Order, OrderStatus
-from core.db_async import async_engine
-from core.binance_futures import create_order_binance, client
+from core.clients.db_async import async_engine
+from flows.tasks.binance_futures import create_order_binance, client
 from prefect import flow, task
 
 from core.views.handle_orders import load_new_orders

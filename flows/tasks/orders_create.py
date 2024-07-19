@@ -2,20 +2,21 @@ import logging
 from decimal import Decimal
 import sys
 from pprint import pprint
-import time
 
 from binance.error import ClientError
+from prefect import task
 
 from core.schemas.position import LongPosition, ShortPosition
-from core.binance_futures import create_order_binance, check_position, get_order_id, cancel_order_binance
+from flows.tasks.binance_futures import create_order_binance, check_position, cancel_order_binance
 from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide, OrderStatus, OrderBinanceStatus
 from core.views.handle_orders import db_get_all_order
-from core.db_sync import execute_sqlmodel_query, execute_sqlmodel_query_single
+from core.clients.db_sync import execute_sqlmodel_query_single
 
 sys.path.append('../../core')
 sys.path.append('')
 
 
+@task
 def create_long_market_order(
         symbol: str,
         quantity: Decimal,
@@ -58,6 +59,7 @@ def create_long_market_order(
     return execute_sqlmodel_query_single(create_order)
 
 
+@task
 def create_short_market_order(symbol: str, quantity: Decimal, leverage: int, webhook_id,
                               side: OrderSide = OrderSide.SELL):
     def create_order(session):
@@ -100,6 +102,8 @@ def create_short_market_order(symbol: str, quantity: Decimal, leverage: int, web
 
     return execute_sqlmodel_query_single(create_order)
 
+
+@task
 def create_long_tp_order(
         symbol: str,
         tp: Decimal,
@@ -146,6 +150,7 @@ def create_long_tp_order(
     return execute_sqlmodel_query_single(create_order)
 
 
+@task
 def create_long_limit_order(
         symbol: str,
         price: Decimal,
@@ -178,6 +183,7 @@ def create_long_limit_order(
     return execute_sqlmodel_query_single(create_order)
 
 
+@task
 def create_short_stop_order(
         symbol: str,
         price: Decimal,
@@ -185,6 +191,7 @@ def create_short_stop_order(
         leverage: int,
         webhook_id
 ) -> Order:
+    # open short position
     print("Creating SHORT STOP order:")
 
     def create_order(session):
@@ -200,23 +207,20 @@ def create_short_stop_order(
         )
 
         order_binance = None
-        timer = 0
 
         order.binance_id = create_order_binance(order)
         order.status = OrderStatus.IN_PROGRESS
 
-        while not order_binance or timer < 10:
-
-            try:
-                order_binance = get_order_id(symbol, order.binance_id)
-                order.binance_status = order_binance['status']
-            except Exception as e:
-                print(e)
-                timer += 1
-
-            if not order_binance:
-                print('!!!!Order not found, retrying')
-                time.sleep(5)
+        # while not order_binance:
+        #     try:
+        #         order_binance = get_order_id(symbol, order.binance_id)
+        #         order.binance_status = order_binance['status']
+        #     except Exception as e:
+        #         print(e)
+        #
+        #     if not order_binance:
+        #         print('!!!!Order not found, retrying')
+        #         time.sleep(5)
 
         pprint(order.model_dump())
 
@@ -227,11 +231,13 @@ def create_short_stop_order(
     return execute_sqlmodel_query_single(create_order)
 
 
+@task
 def create_short_stop_loss_order(
         symbol: str,
         sl_short: float,
         leverage: int,
-        webhook_id
+        webhook_id,
+        price_original: Decimal = None
 ) -> Order:
     print("SHORT-BUY:")
 
@@ -239,41 +245,41 @@ def create_short_stop_loss_order(
         _, position_short = check_position(symbol=symbol)
         position_short: ShortPosition
 
-        price = Decimal(position_short.entryPrice) * (1 + Decimal(sl_short) / 100)
+        price_position = Decimal(position_short.entryPrice) * (1 + Decimal(sl_short) / 100)
         quantity = abs(position_short.positionAmt)
-        print('price:', price)
+        print('price:', price_position)
         print('quantity:', quantity)
 
-        order = Order(
-            position_side=OrderPositionSide.SHORT,
-            side=OrderSide.BUY,
-            type=OrderType.SHORT_STOP_LOSS,
-            symbol=symbol,
-            price=price,
-            quantity=quantity,
-            leverage=leverage,
-            webhook_id=webhook_id,
-        )
+        if price_original < price_position:
 
-        order_binance = None
-        timer = 0
+            order = Order(
+                position_side=OrderPositionSide.SHORT,
+                side=OrderSide.BUY,
+                type=OrderType.SHORT_STOP_LOSS,
+                symbol=symbol,
+                price=price_position,
+                quantity=quantity,
+                leverage=leverage,
+                webhook_id=webhook_id,
+            )
+        else:
+            order = Order(
+                position_side=OrderPositionSide.SHORT,
+                side=OrderSide.BUY,
+                type=OrderType.SHORT_MARKET,
+                symbol=symbol,
+                quantity=quantity,
+                leverage=leverage,
+                webhook_id=webhook_id,
+                order_number=0
+            )
 
-        order.binance_id = create_order_binance(order)
+        try:
+            order.binance_id = create_order_binance(order)
+        except Exception as e:
+            print(e)
         order.status = OrderStatus.IN_PROGRESS
         pprint(order.model_dump())
-
-        while not order_binance or timer < 10:
-
-            try:
-                order_binance = get_order_id(symbol, order.binance_id)
-                order.binance_status = order_binance['status']
-            except Exception as e:
-                print(e)
-
-            if not order_binance:
-                print('!!!!Order not found, retrying')
-                time.sleep(5)
-                timer += 1
 
         session.add(order)
         session.commit()

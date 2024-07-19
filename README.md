@@ -5,7 +5,7 @@ https://docs.google.com/spreadsheets/d/1g1U8zsxZvC6TDC3TF3Krb2pm9n2MaENUmvOtpRWR
 
 
 prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
-
+prefect server start
 
 1. Приходит вебхук
 2. Проверка позиции

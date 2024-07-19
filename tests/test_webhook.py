@@ -12,15 +12,15 @@ from core.schemas.webhook import WebhookPayload
 
 def test_webhook():
     # Загрузка данных из файла example.json
-    with open('tests/unfi.json', 'r') as file:
+    with open('tests/floki.json', 'r') as file:
         data = json.load(file)
 
     payload = WebhookPayload(**data)
     pprint(payload.model_dump())
 
     # Отправка данных на вебхук эндпоинт
-    # url = "http://127.0.0.1:8000/webhook"
-    url = "http://45.32.253.11/webhook"
+    url = "http://127.0.0.1:8000/webhook"
+    # url = "http://45.32.253.11/webhook"
     # url = "https://trade.superduperai.co/webhook"  # URL вашего вебхука
     headers = {"Content-Type": "application/json"}
     response = requests.post(url, json=data, headers=headers)
