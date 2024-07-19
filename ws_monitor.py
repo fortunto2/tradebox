@@ -1,11 +1,13 @@
 
 
 from core.models.monitor import TradeMonitorBase
+from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.schemas.events.account_update import UpdateData
 import json
 from decimal import Decimal
 from config import get_settings
+from flows.agg_trade_flow import calculate_pnl, close_position_by_pnl_flow
 from flows.tasks.binance_futures import client, check_position
 from core.logger import logger
 from flows.order_filled_flow import order_filled_flow
@@ -45,13 +47,13 @@ class TradeMonitor(TradeMonitorBase):
         message_dict = json.loads(msg)
         event_type = message_dict.get('e')
 
-        # if event_type == 'aggTrade':
-        #     event = AggregatedTradeEvent.parse_obj(message_dict)
-        #     pnl_diff = calculate_pnl(self, event)
-        #
-        #     if pnl_diff > 0:
-        #         logger.warning(f"=Profit: {pnl_diff} USDT")
-        #         close_position_by_pnl_flow(self, event)
+        if event_type == 'aggTrade':
+            event = AggregatedTradeEvent.parse_obj(message_dict)
+            pnl_diff = calculate_pnl(self, event)
+
+            if pnl_diff > 0:
+                logger.warning(f"=Profit: {pnl_diff} USDT")
+                close_position_by_pnl_flow(self, event)
 
         if event_type == 'ORDER_TRADE_UPDATE':
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))

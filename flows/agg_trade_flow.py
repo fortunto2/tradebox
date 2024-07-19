@@ -1,5 +1,7 @@
 from decimal import Decimal
 from prefect import flow, tags
+from prefect.task_runners import ConcurrentTaskRunner
+
 from core.logger import logger
 from flows.tasks.binance_futures import cancel_open_orders
 from core.models.monitor import TradeMonitorBase
@@ -25,7 +27,7 @@ def calculate_pnl(self: TradeMonitorBase, event: AggregatedTradeEvent):
     return False
 
 
-@flow
+@flow(task_runner=ConcurrentTaskRunner())
 def close_position_by_pnl_flow(self: TradeMonitorBase, event: AggregatedTradeEvent):
     with tags(event.symbol):
         status_cancel = cancel_open_orders(symbol=event.symbol)

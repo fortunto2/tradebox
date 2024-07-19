@@ -1,6 +1,7 @@
 from time import sleep
 from prefect import task, flow, tags
 from prefect import flow, get_run_logger
+from prefect.task_runners import ConcurrentTaskRunner
 
 from flows.tasks.binance_futures import cancel_open_orders
 from core.clients.db_sync import SessionLocal
@@ -22,7 +23,7 @@ def handle_order_update(event):
     pass
 
 
-@flow
+@flow(task_runner=ConcurrentTaskRunner())
 def order_filled_flow(event: OrderTradeUpdate):
     with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
         with SessionLocal() as session:

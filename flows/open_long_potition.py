@@ -1,11 +1,13 @@
 from prefect import task, flow, tags
+from prefect.task_runners import ConcurrentTaskRunner
+
 from core.schemas.webhook import WebhookPayload
 
 from flows.tasks.orders_create import create_long_market_order, create_long_tp_order
 from flows.tasks.orders_processing import grid_make_long_limit_order
 
 
-@flow
+@flow(task_runner=ConcurrentTaskRunner())
 async def open_long_position(payload: WebhookPayload, webhook_id):
     with tags(payload.symbol, webhook_id):
         first_order = create_long_market_order(
