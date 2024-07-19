@@ -6,12 +6,12 @@
   "open": {
     "enabled": true,
     "amountType": "amount",
-    "amount": "113",
+    "amount": "50",
     "leverage": "25"
   },
   "settings": {
     "deposit": 5.0,
-    "extramarg": 10.0,
+    "extramarg": 5.0,
     "tp": "1.06",
     "trail_1": 1.1,
     "trail_2": 0.0,
