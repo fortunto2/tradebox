@@ -116,12 +116,12 @@ def create_long_tp_order(
         orders = db_get_all_order(webhook_id, OrderStatus.IN_PROGRESS, OrderType.LONG_TAKE_PROFIT)
         for order in orders:
             try:
-                result = cancel_order_binance(symbol, order.binance_id)
-                if result['status'] == 'CANCELED':
-                    order.status = OrderStatus.CANCELED
-                    session.add(order)
+                result = cancel_order_binance.submit(symbol, order.binance_id)
+                # if result['status'] == 'CANCELED':
+                #     order.status = OrderStatus.CANCELED
             except Exception as e:
                 print(e)
+                logging.error(f"Error canceling order: {e}")
 
         position_long, _ = check_position(symbol=symbol)
         position_long: LongPosition

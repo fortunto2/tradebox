@@ -33,6 +33,8 @@ if config.config_file_name is not None:
 
 from core.models.orders import Order
 from core.models.webhook import WebHook
+from core.models.binance_symbol import BinanceSymbol
+from core.models.binance_position import BinancePosition
 
 target_metadata = SQLModel.metadata
 

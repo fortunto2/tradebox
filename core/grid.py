@@ -87,7 +87,7 @@ def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal, fee_p
 
     return result
 
-@task
+
 def update_grid(
         payload: WebhookPayload,
         webhook_id: int,

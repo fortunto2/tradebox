@@ -2,10 +2,12 @@ from fastapi import FastAPI, Depends
 import logging
 
 import sentry_sdk
+from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from core.clients.db_async import get_async_session
-from core.clients.db_sync import sync_engine
+from core.clients.db_async import get_async_session, async_engine
+from core.clients.db_sync import SessionLocal, sync_engine
+# from core.clients.db_sync import sync_engine
 from flows.open_long_potition import open_long_position
 
 sentry_sdk.init(
@@ -39,8 +41,7 @@ from fastapi.exceptions import RequestValidationError
 
 from sqladmin import Admin, ModelView
 
-admin = Admin(app, engine=sync_engine, base_url="/rust_admin")
-
+admin = Admin(app, engine=async_engine, base_url="/rust_admin")
 
 class WebhooksAdmin(ModelView, model=WebHook):
     can_create = True
@@ -102,8 +103,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 async def on_startup():
-    # with SessionLocal as conn:
-    #     SQLModel.metadata.create_all()
+    SQLModel.metadata.create_all(sync_engine)
 
     #     check dual mode
     dual_mode = check_position_side_dual()
@@ -165,4 +165,4 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="info", reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8009, log_level="info", reload=True)

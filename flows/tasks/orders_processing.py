@@ -42,7 +42,7 @@ def open_short_position_loop(
     quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
 
     # только один раз, когда хватает денег
-    hedge_stop_order = create_short_stop_order(
+    hedge_stop_order = create_short_stop_order.submit(
         symbol=payload.symbol,
         price=hedge_price,
         quantity=quantity,
@@ -53,7 +53,6 @@ def open_short_position_loop(
     return hedge_stop_order.binance_id
 
 
-@task
 def get_grid_orders(
         symbol: str,
         status: OrderStatus = OrderStatus.FILLED,
@@ -136,7 +135,7 @@ def grid_make_long_limit_order(
         else:
             price, quantity = grid[len(filled_orders)]
 
-        limit_order = create_long_limit_order(
+        limit_order = create_long_limit_order.submit(
             symbol=payload.symbol,
             price=price,
             quantity=quantity,

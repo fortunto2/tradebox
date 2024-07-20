@@ -9,11 +9,14 @@ import sys
 import logging
 
 from fastapi import HTTPException
-from prefect import task
+from prefect import task, tags
 from prefect.tasks import task_input_hash
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from tqdm import tqdm
 
+from core.clients.db_sync import SessionLocal, execute_sqlmodel_query_single
+from core.models.binance_symbol import BinanceSymbol
 from core.schemas.position import LongPosition, ShortPosition
 
 sys.path.append('../..')
@@ -48,23 +51,42 @@ def adjust_precision(value, precision):
     quantize_str = '1.' + '0' * precision if precision > 0 else '1'
     return value.quantize(Decimal(quantize_str), rounding=ROUND_DOWN)
 
-@task
+
+def get_symbol_quantity_and_precisions(symbol):
+
+    def query_func(session_local):
+        query = select(BinanceSymbol).where(BinanceSymbol.symbol == symbol)
+        result = session_local.exec(query)
+        return result.first()
+
+    bs = execute_sqlmodel_query_single(query_func)
+    if not bs:
+
+        symbol_info = get_symbol_info(symbol)
+        if not symbol_info:
+            raise ValueError(f"Symbol {symbol} not found in exchange info")
+
+        quantity_precision = 0
+        price_precision = 8
+
+        for filter in symbol_info['filters']:
+            if filter['filterType'] == 'LOT_SIZE':
+                quantity_precision = int(filter['stepSize'].find('1') - 1)
+            if filter['filterType'] == 'PRICE_FILTER':
+                price_precision = int(filter['tickSize'].find('1') - 1)
+
+        print("quantity_precision: ", quantity_precision)
+        print("price_precision : ", price_precision)
+        with SessionLocal() as session:
+            bs = BinanceSymbol(symbol=symbol, quantity_precision=quantity_precision, price_precision=price_precision)
+            session.add(bs)
+            session.commit()
+
+    return bs.quantity_precision, bs.price_precision
+
+
 def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
-    symbol_info = get_symbol_info(symbol)
-    if not symbol_info:
-        raise ValueError(f"Symbol {symbol} not found in exchange info")
-
-    quantity_precision = 0
-    price_precision = 8
-
-    for filter in symbol_info['filters']:
-        if filter['filterType'] == 'LOT_SIZE':
-            quantity_precision = int(filter['stepSize'].find('1') - 1)
-        if filter['filterType'] == 'PRICE_FILTER':
-            price_precision = int(filter['tickSize'].find('1') - 1)
-
-    print("quantity_precision: ", quantity_precision)
-    print("price_precision : ", price_precision)
+    quantity_precision, price_precision = get_symbol_quantity_and_precisions(symbol)
 
     if price is None:
         price = client.ticker_price(symbol).get('price')
@@ -77,7 +99,10 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
     return quantity, price
 
 
-@task
+@task(
+    name=f'create_order_binance',
+    task_run_name='create_order_{order.side.value}_{order.type.value}'
+)
 def create_order_binance(order: Order):
     """
     https://binance-docs.github.io/apidocs/futures/en/#new-order-trade
@@ -86,36 +111,38 @@ def create_order_binance(order: Order):
     :return:
     """
 
-    # todo: надо вынести в базу данные по точности числа quantity
-    quantity, price = get_symbol_price_and_quantity_by_precisions(order.symbol, order.quantity, order.price)
+    with tags(order.symbol, order.side.value, order.type.value, order.position_side.value):
 
-    order_params = {
-        "symbol": order.symbol,
-        "type": order.type.value,
-        "quantity": quantity,
-        "positionSide": order.position_side.value,
-        "side": order.side.value,
-        'newClientOrderId': order.id,
-    }
+        # todo: надо вынести в базу данные по точности числа quantity
+        quantity, price = get_symbol_price_and_quantity_by_precisions(order.symbol, order.quantity, order.price)
 
-    if order.type == OrderType.LONG_MARKET or order.type == OrderType.SHORT_MARKET:
-        order_params["type"] = 'MARKET'
-    elif order.type in [OrderType.SHORT_LIMIT, OrderType.SHORT_STOP_LOSS]:
-        order_params["stopPrice"] = price
-        order_params["price"] = price
-        order_params["type"] = 'STOP'
-    else:
-        order_params["price"] = price
-        order_params["timeInForce"] = "GTC"
-        order_params["type"] = 'LIMIT'
+        order_params = {
+            "symbol": order.symbol,
+            "type": order.type.value,
+            "quantity": quantity,
+            "positionSide": order.position_side.value,
+            "side": order.side.value,
+            'newClientOrderId': order.id,
+        }
 
-    response = client.new_order(**order_params)
+        if order.type == OrderType.LONG_MARKET or order.type == OrderType.SHORT_MARKET:
+            order_params["type"] = 'MARKET'
+        elif order.type in [OrderType.SHORT_LIMIT, OrderType.SHORT_STOP_LOSS]:
+            order_params["stopPrice"] = price
+            order_params["price"] = price
+            order_params["type"] = 'STOP'
+        else:
+            order_params["price"] = price
+            order_params["timeInForce"] = "GTC"
+            order_params["type"] = 'LIMIT'
 
-    logging.info(f"Order created successfully: {response}")
-    return str(response['orderId'])
-    # except Exception as e:
-    #     logging.error(f"Failed to create order: {e}")
-    #     raise HTTPException(status_code=500, detail="Failed to create order")
+        response = client.new_order(**order_params)
+
+        logging.info(f"Order created successfully: {response}")
+        return str(response['orderId'])
+        # except Exception as e:
+        #     logging.error(f"Failed to create order: {e}")
+        #     raise HTTPException(status_code=500, detail="Failed to create order")
 
 
 @task

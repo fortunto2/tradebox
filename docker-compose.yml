@@ -12,5 +12,52 @@ services:
     env_file:
       - .env
     ports:
-      - "8006:8000"
-    command: uvicorn main:app --reload --host 0.0.0.0 --port 8000
+      - "8006:8009"
+    command: uvicorn main:app --reload --host 0.0.0.0 --port 8009
+
+
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    volumes:
+      - .docker/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=1z63W6IWWy
+      - POSTGRES_DB=tradebox
+    healthcheck:
+      test: [ 'CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}' ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  prefect-server:
+    image: prefecthq/prefect:3.0.0rc11-python3.11
+    restart: unless-stopped
+    ports:
+      - '4200:4200'
+    env_file:
+      - .env
+    volumes:
+      - .docker/prefect:/root/.prefect
+    command: prefect server start
+
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=dbpassword
+      - ADMIN_USERS=postgres,admin
+    ports:
+      - "5432:5432"
+
+volumes:
+  pgdata:
