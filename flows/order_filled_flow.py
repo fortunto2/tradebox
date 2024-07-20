@@ -98,3 +98,4 @@ def order_filled_flow(event: OrderTradeUpdate):
                 logger.info(f"Create short_stop_loss_order: {short_stop_loss_order.id}")
 
         session.commit()
+
