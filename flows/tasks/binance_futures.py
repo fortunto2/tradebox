@@ -60,6 +60,9 @@ def get_symbol_quantity_and_precisions(symbol):
         return result.first()
 
     bs = execute_sqlmodel_query_single(query_func)
+    quantity_precision = bs.quantity_precision
+    price_precision = bs.price_precision
+
     if not bs:
 
         symbol_info = get_symbol_info(symbol)
@@ -81,8 +84,10 @@ def get_symbol_quantity_and_precisions(symbol):
             bs = BinanceSymbol(symbol=symbol, quantity_precision=quantity_precision, price_precision=price_precision)
             session.add(bs)
             session.commit()
+            quantity_precision = bs.quantity_precision
+            price_precision = bs.price_precision
 
-    return bs.quantity_precision, bs.price_precision
+    return quantity_precision, price_precision
 
 
 def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
