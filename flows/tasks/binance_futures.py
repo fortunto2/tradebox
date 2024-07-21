@@ -60,9 +60,6 @@ def get_symbol_quantity_and_precisions(symbol):
         return result.first()
 
     bs = execute_sqlmodel_query_single(query_func)
-    quantity_precision = bs.quantity_precision
-    price_precision = bs.price_precision
-
     if not bs:
 
         symbol_info = get_symbol_info(symbol)
@@ -86,6 +83,9 @@ def get_symbol_quantity_and_precisions(symbol):
             session.commit()
             quantity_precision = bs.quantity_precision
             price_precision = bs.price_precision
+    else:
+        quantity_precision = bs.quantity_precision
+        price_precision = bs.price_precision
 
     return quantity_precision, price_precision
 
