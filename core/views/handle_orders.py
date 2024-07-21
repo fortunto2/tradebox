@@ -146,6 +146,24 @@ def db_get_order(order_id) -> Order:
 
     return execute_sqlmodel_query_single(query_func)
 
+
+@task(
+    name=f'set_order_status',
+    task_run_name='set_{order_id}_status_{status.value}'
+)
+def db_set_order_status(order_id, status: OrderStatus, binance_status: str = None) -> Order:
+    def query_func(session):
+        order = session.get(Order, order_id)
+        order.status = status
+        if binance_status:
+            order.binance_status = binance_status
+        session.add(order)
+        session.commit()
+        return order
+
+    return execute_sqlmodel_query_single(query_func)
+
+
 @task
 def db_get_order_binance_id(order_binance_id) -> Order:
     def query_func(session):

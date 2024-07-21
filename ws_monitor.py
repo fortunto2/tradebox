@@ -1,12 +1,14 @@
 
 
 from core.models.monitor import TradeMonitorBase
+from core.models.orders import OrderStatus
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.schemas.events.account_update import UpdateData
 import json
 from decimal import Decimal
 from config import get_settings
+from core.views.handle_orders import db_set_order_status
 from flows.agg_trade_flow import calculate_pnl, close_position_by_pnl_flow
 from flows.tasks.binance_futures import client, check_position
 from core.logger import logger
@@ -65,6 +67,10 @@ class TradeMonitor(TradeMonitorBase):
                     logger.warning(f"Order Market Filled: {event.order_status}, {event.order_type}")
                     return None
                 order_filled_flow(event)
+
+            elif event.order_status == 'CANCELED':
+                logger.warning(f"Order Canceled: {event.order_status}, {event.order_type}")
+                db_set_order_status.submit(event.order_id, OrderStatus.CANCELED)
 
         elif event_type == 'ACCOUNT_UPDATE':
             event = UpdateData.parse_obj(message_dict['a'])
