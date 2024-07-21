@@ -29,6 +29,7 @@ services:
 
   prefect-agent:
     <<: *prefect
+    ports: []
     command: prefect worker start --pool "local"
 
 
