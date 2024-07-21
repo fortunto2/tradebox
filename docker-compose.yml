@@ -45,7 +45,7 @@ services:
     ports: []
     command: prefect worker start --pool "local"
 
-postgres:
+  postgres:
     image: postgres:16-alpine
     restart: always
     env_file:
