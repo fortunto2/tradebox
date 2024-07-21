@@ -15,6 +15,11 @@ services:
       - "8006:8009"
     command: uvicorn main:app --reload --host 0.0.0.0 --port 8009
 
+   ws:
+    <<: *backend
+    ports: []
+    command: python ws_monitor.py --symbol=1000FLOKIUSDT
+
 
   prefect-server: &prefect
     image: prefecthq/prefect:3.0.0rc11-python3.11
@@ -24,7 +29,12 @@ services:
     env_file:
       - .env
     environment:
-      - PREFECT_API_URL=http://prefect-server:4200
+      - PREFECT_SERVER_API_HOST=0.0.0.0
+      - PREFECT_UI_URL=http://20.243.22.4:4200/api
+      - PREFECT_API_URL=http://20.243.22.4:4200/api
+#      - PREFECT_API_DATABASE_CONNECTION_URL=${DATABASE_URL}
+      - PREFECT_API_DATABASE_ECHO=False
+      - PREFECT_API_DATABASE_MIGRATE_ON_START=True
     volumes:
       - .docker/prefect:/root/.prefect
     command: prefect server start
