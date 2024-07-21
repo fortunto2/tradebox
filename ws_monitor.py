@@ -71,8 +71,6 @@ class TradeMonitor(TradeMonitorBase):
 
             elif event.order_status == 'CANCELED':
                 logger.warning(f"Order Canceled: {event.order_status}, {event.order_type}")
-                flow_run = run_deployment(name="my_flow_name/my_deployment_name")
-
                 order_cancel_flow(event)
 
         elif event_type == 'ACCOUNT_UPDATE':

@@ -23,7 +23,7 @@ def handle_order_update(event):
     pass
 
 
-@flow(task_runner=ConcurrentTaskRunner())
+@flow(task_runner=ConcurrentTaskRunner(), log_prints=True)
 def order_filled_flow(event: OrderTradeUpdate):
     with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
         with SessionLocal() as session:

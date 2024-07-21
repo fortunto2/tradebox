@@ -10,7 +10,7 @@ from core.schemas.webhook import WebhookPayload
 from core.views.handle_orders import db_get_order_binance_id, get_webhook_last, db_set_order_status
 
 
-@flow(task_runner=ConcurrentTaskRunner())
+@flow(task_runner=ConcurrentTaskRunner(), log_prints=True)
 def order_cancel_flow(event: OrderTradeUpdate):
 
     # with SessionLocal() as session:
