@@ -41,7 +41,7 @@ services:
   prefect-agent:
     <<: *prefect
     environment:
-      - PREFECT_API_URL=http://prefect-server:4200
+      - PREFECT_API_URL=http://20.243.22.4:4200/api
     ports: []
     command: prefect worker start --pool "local"
 
