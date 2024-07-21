@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     DB_CONNECTION_STR: str = "postgresql://postgres:rust_admin@localhost:5432/tradebox"
     DB_ASYNC_CONNECTION_STR: str = "postgresql+asyncpg://postgres:rust_admin@localhost:5432/tradebox"
 
+    PREFECT_API_URL: str = "http://127.0.0.1:4200/api"
+
     class Config:
         case_sensitive = True
         env_file = ".env"
