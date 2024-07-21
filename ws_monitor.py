@@ -10,6 +10,7 @@ from decimal import Decimal
 from config import get_settings
 from core.views.handle_orders import db_set_order_status
 from flows.agg_trade_flow import calculate_pnl, close_position_by_pnl_flow
+from flows.order_cancel_flow import order_cancel_flow
 from flows.tasks.binance_futures import client, check_position
 from core.logger import logger
 from flows.order_filled_flow import order_filled_flow
@@ -70,7 +71,7 @@ class TradeMonitor(TradeMonitorBase):
 
             elif event.order_status == 'CANCELED':
                 logger.warning(f"Order Canceled: {event.order_status}, {event.order_type}")
-                db_set_order_status.submit(event.order_id, OrderStatus.CANCELED)
+                order_cancel_flow(event)
 
         elif event_type == 'ACCOUNT_UPDATE':
             event = UpdateData.parse_obj(message_dict['a'])
@@ -80,6 +81,11 @@ class TradeMonitor(TradeMonitorBase):
     def handle_account_update(self, event: UpdateData):
         for position in event.positions:
             if position.position_side == 'LONG':
+
+                if position.position_amount != self.long_position_qty:
+                    logger.warning(f"Changed position in {position.symbol} from {self.long_position_qty} to {position.position_amount}")
+                    # todo: cancel tp order and set new
+
                 self.long_position_qty = Decimal(position.position_amount)
                 self.long_entry_price = Decimal(position.breakeven_price)
                 logger.info(f'UPDATE Long PNL: {position.unrealized_pnl}')

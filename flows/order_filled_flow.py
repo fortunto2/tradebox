@@ -77,7 +77,7 @@ def order_filled_flow(event: OrderTradeUpdate):
                         payload=payload
                     )
                 else:
-                    logger.info(f"stop: filled_orders {filled_orders_in_db} >= grid_orders {grid_orders}")
+                    logger.info(f"stop: filled_orders {len(grid)} <= grid_orders {len(filled_orders_in_db)}")
 
 
             elif order.type == OrderType.SHORT_STOP_LOSS:
