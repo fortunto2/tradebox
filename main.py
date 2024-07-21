@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import settings
 from core.clients.db_async import get_async_session, async_engine
 from core.clients.db_sync import SessionLocal, sync_engine
+from core.models.binance_symbol import BinanceSymbol
 # from core.clients.db_sync import sync_engine
 from flows.open_long_potition import open_long_position
 
@@ -57,6 +58,13 @@ class WebhooksAdmin(ModelView, model=WebHook):
 
 admin.add_view(WebhooksAdmin)
 
+class BinanceSymbolAdmin(ModelView, model=BinanceSymbol):
+    can_create = False
+    can_edit = False
+    can_delete = False
+    column_list = [BinanceSymbol.symbol, BinanceSymbol.quantity_precision, BinanceSymbol.price_precision]
+
+admin.add_view(BinanceSymbolAdmin)
 
 class OrdersAdmin(ModelView, model=Order):
     can_create = False
