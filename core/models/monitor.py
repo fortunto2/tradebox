@@ -1,15 +1,23 @@
 from decimal import Decimal
+from typing import List, Dict
 
-from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
+from pydantic import BaseModel, Field
+
+
+class SymbolPosition(BaseModel):
+    long_qty: Decimal = Field(default_factory=lambda: Decimal(0))
+    long_entry: Decimal = Field(default_factory=lambda: Decimal(0))
+    short_qty: Decimal = Field(default_factory=lambda: Decimal(0))
+    short_entry: Decimal = Field(default_factory=lambda: Decimal(0))
+    long_pnl: Decimal = Field(default_factory=lambda: Decimal(0))
+    short_pnl: Decimal = Field(default_factory=lambda: Decimal(0))
 
 
 class TradeMonitorBase:
-    def __init__(self, symbols):
+
+    def __init__(self, symbols: List[str]):
         self.symbols = symbols
-        self.long_position_qty = Decimal(0)
-        self.long_entry_price = Decimal(0)
-        self.short_position_qty = Decimal(0)
-        self.short_entry_price = Decimal(0)
-        self.client = UMFuturesWebsocketClient(on_message=self.on_message)
-        self.long_pnl = 0
-        self.short_pnl = 0
+        self.positions: Dict[str, SymbolPosition] = {symbol: SymbolPosition() for symbol in symbols}
+
+    def on_message(self, message):
+        pass

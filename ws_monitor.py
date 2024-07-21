@@ -1,19 +1,20 @@
-from prefect.deployments import run_deployment
+from typing import List, Dict
 
-from core.models.monitor import TradeMonitorBase
-from core.models.orders import OrderStatus
+from pydantic import BaseModel, Field
+
+from core.models.monitor import TradeMonitorBase, SymbolPosition
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.schemas.events.account_update import UpdateData
 import json
 from decimal import Decimal
 from config import get_settings
-from core.views.handle_orders import db_set_order_status
-from flows.agg_trade_flow import calculate_pnl, close_position_by_pnl_flow
-from flows.order_cancel_flow import order_cancel_flow
 from flows.tasks.binance_futures import client, check_position
 from core.logger import logger
+from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
+from flows.agg_trade_flow import close_position_by_pnl_flow
 from flows.order_filled_flow import order_filled_flow
+from flows.order_cancel_flow import order_cancel_flow
 
 settings = get_settings()
 
@@ -27,41 +28,51 @@ settings = get_settings()
 settings = get_settings()
 
 
-class TradeMonitor(TradeMonitorBase):
+class TradeMonitor:
+
+    def __init__(self, symbols: List[str]):
+        self.symbols = symbols
+        self.positions: Dict[str, SymbolPosition] = {symbol: SymbolPosition() for symbol in symbols}
+        self.client = UMFuturesWebsocketClient(on_message=self.on_message)
+        # super().__init__(symbols)
 
     def start_monitor_events(self):
         listen_key = client.new_listen_key().get('listenKey')
         for symbol in self.symbols:
             position_long, position_short = check_position(symbol)
             if position_long:
-                self.long_position_qty = position_long.positionAmt
-                self.long_entry_price = position_long.breakEvenPrice
-                logger.warning(f"{symbol} +LONG -> qty: {self.long_position_qty}, Entry price: {self.long_entry_price}")
-            if position_short:
-                self.short_position_qty = position_short.positionAmt
-                self.short_entry_price = position_short.breakEvenPrice
+                self.positions[symbol].long_qty = position_long.positionAmt
+                self.positions[symbol].long_entry = position_long.breakEvenPrice
                 logger.warning(
-                    f"{symbol} -SHORT -> qty: {self.short_position_qty}, Entry price: {self.short_entry_price}")
+                    f"{symbol} +LONG -> qty: {self.positions[symbol].long_qty}, Entry price: {self.positions[symbol].long_entry}")
+            if position_short:
+                self.positions[symbol].short_qty = position_short.positionAmt
+                self.positions[symbol].short_entry = position_short.breakEvenPrice
+                logger.warning(
+                    f"{symbol} -SHORT -> qty: {self.positions[symbol].short_qty}, Entry price: {self.positions[symbol].short_entry}")
             self.client.agg_trade(symbol)
-
         self.client.user_data(listen_key=listen_key)
 
     def on_message(self, ws, msg):
+
         message_dict = json.loads(msg)
         event_type = message_dict.get('e')
 
         if event_type == 'aggTrade':
             event = AggregatedTradeEvent.parse_obj(message_dict)
-            pnl_diff = calculate_pnl(self, event)
+            position: SymbolPosition = self.positions[event.symbol]
+
+            pnl_diff = calculate_pnl(position, event)
 
             if pnl_diff > 0:
                 logger.warning(f"=Profit: {pnl_diff} USDT")
-                close_position_by_pnl_flow(self, event)
+                close_position_by_pnl_flow(position, event)
 
-        if event_type == 'ORDER_TRADE_UPDATE':
+        elif event_type == 'ORDER_TRADE_UPDATE':
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
             if event.symbol not in self.symbols:
                 return None
+            # position: SymbolPosition = self.positions[event.symbol]
 
             if event.order_status == 'FILLED':
                 if event.order_type == 'MARKET':
@@ -75,29 +86,49 @@ class TradeMonitor(TradeMonitorBase):
 
         elif event_type == 'ACCOUNT_UPDATE':
             event = UpdateData.parse_obj(message_dict['a'])
-            # account_update_flow(event)
             self.handle_account_update(event)
 
     def handle_account_update(self, event: UpdateData):
         for position in event.positions:
+            symbol = position.symbol
+
+            if symbol not in self.positions:
+                continue
+
             if position.position_side == 'LONG':
-
-                if position.position_amount != self.long_position_qty:
-                    logger.warning(f"Changed position in {position.symbol} from {self.long_position_qty} to {position.position_amount}")
-                    # todo: cancel tp order and set new
-
-                self.long_position_qty = Decimal(position.position_amount)
-                self.long_entry_price = Decimal(position.breakeven_price)
+                if position.position_amount != self.positions[symbol].long_qty:
+                    logger.warning(
+                        f"Changed position in {symbol} from {self.positions[symbol].long_qty} to {position.position_amount}")
+                self.positions[symbol].long_qty = Decimal(position.position_amount)
+                self.positions[symbol].long_entry = Decimal(position.breakeven_price)
                 logger.info(f'UPDATE Long PNL: {position.unrealized_pnl}')
                 logger.info(position)
+
             elif position.position_side == 'SHORT':
-                self.short_position_qty = Decimal(position.position_amount)
-                self.short_entry_price = Decimal(position.breakeven_price)
+                if position.position_amount != self.positions[symbol].short_qty:
+                    logger.warning(
+                        f"Changed position in {symbol} from {self.positions[symbol].short_qty} to {position.position_amount}")
+                self.positions[symbol].short_qty = Decimal(position.position_amount)
+                self.positions[symbol].short_entry = Decimal(position.breakeven_price)
                 logger.info(f'UPDATE Short PNL: {position.unrealized_pnl}')
                 logger.info(position)
 
 
-def check_orders(symbols):
+def calculate_pnl(position: SymbolPosition, event: AggregatedTradeEvent):
+    trade_price = Decimal(event.price)
+    long_pnl = 0
+    short_pnl = 0
+
+    if position.long_qty != 0:
+        long_pnl = round((trade_price - position.long_entry) * position.long_qty, 2)
+
+    if position.short_qty != 0:
+        short_pnl = round((trade_price - position.short_entry) * position.short_qty, 2)
+
+    return round(long_pnl + short_pnl, 2)
+
+
+def check_orders(symbols: List[str]):
     for symbol in symbols:
         position_long, position_short = check_position(symbol)
         if not position_long.positionAmt:

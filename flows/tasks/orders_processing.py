@@ -20,9 +20,7 @@ def open_short_position_loop(
         webhook_id,
         order_binance_id: str,
 ):
-    extramarg = Decimal(payload.settings.extramarg)
 
-    # quantity - в цикле уменьшеается, вычитаем убытки
 
     pnl = get_position_closed_pnl(payload.symbol, int(order_binance_id))
     print("pnl:", pnl)
