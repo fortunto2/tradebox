@@ -218,8 +218,8 @@ def create_short_stop_order(
 
         pprint(order.model_dump())
 
-        session.add(order)
-        session.commit()
+        # session.add(order)
+        # session.commit()
         return order
 
     return execute_sqlmodel_query_single(create_order)
@@ -277,8 +277,8 @@ def create_short_stop_loss_order(
         order.status = OrderStatus.IN_PROGRESS
         pprint(order.model_dump())
 
-        session.add(order)
-        session.commit()
+        # session.add(order)
+        # session.commit()
         return order
 
     return execute_sqlmodel_query_single(create_order)

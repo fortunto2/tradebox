@@ -67,7 +67,7 @@ class Order(BaseTable, table=True):
     price: Optional[Decimal] = None
     stop_price: Optional[Decimal] = None  # for Limit orders
     quantity: Decimal
-    leverage: int
+    leverage: Optional[int] = None
     type: OrderType
     status: Optional[OrderStatus] = OrderStatus.NEW
     binance_status: Optional[OrderBinanceStatus] = None

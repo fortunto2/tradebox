@@ -10,6 +10,7 @@ import json
 from decimal import Decimal
 from config import get_settings
 from core.schemas.position import LongPosition, ShortPosition
+from flows.order_new_flow import order_new_flow
 from flows.tasks.binance_futures import client, check_position
 from core.logger import logger
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
@@ -76,6 +77,7 @@ class TradeMonitor:
             if event.symbol not in self.symbols:
                 return None
             position: SymbolPosition = self.positions[event.symbol]
+            logger.info(event.symbol, event.order_id, event.order_type, event.order_status, event.position_side, event.side)
 
             if event.order_status == 'FILLED':
                 if event.order_type == 'MARKET':
@@ -86,6 +88,14 @@ class TradeMonitor:
             elif event.order_status == 'CANCELED':
                 logger.warning(f"Order Canceled: {event.order_status}, {event.order_type}")
                 order_cancel_flow(event)
+
+            elif event.order_status == 'REJECTED':
+                logger.warning(f"Order Rejected: {event.order_status}, {event.order_type}")
+            elif event.order_status == 'EXPIRED':
+                logger.warning(f"Order Expired: {event.order_status}, {event.order_type}")
+            elif event.order_status == 'NEW':
+                logger.warning(f"Order New: {event.order_status}, {event.order_type}")
+                order_new_flow(event)
 
         elif event_type == 'ACCOUNT_UPDATE':
             event = UpdateData.parse_obj(message_dict['a'])
@@ -152,8 +162,9 @@ import click
 @click.option("--symbol", prompt="Symbol", default="1000FLOKIUSDT", show_default=True,
               help="Enter the trading symbol (default: 1000FLOKIUSDT)")
 def main(symbol):
-    check_orders([symbol])
-    trade_monitor = TradeMonitor([symbol])
+    symbols = ['UNFIUSDT', '1000FLOKIUSDT']
+    check_orders(symbols)
+    trade_monitor = TradeMonitor(symbols)
     trade_monitor.start_monitor_events()
 
 

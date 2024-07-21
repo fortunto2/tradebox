@@ -35,6 +35,10 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
             logger.info(f"Order binance_id: {order_binance_id}")
 
             order: Order = db_get_order_binance_id(order_binance_id)
+            if not order:
+                logger.error(f"Order not found in DB - {order_binance_id}")
+                return None
+
             webhook = order.webhook
             webhook_id = order.webhook.id
 

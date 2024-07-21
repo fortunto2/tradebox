@@ -21,11 +21,15 @@ def order_cancel_flow(event: OrderTradeUpdate):
     order_binance_id = str(event.order_id)
     logger.info(f"Order binance_id: {order_binance_id}")
 
-    order: Order = db_set_order_status(
-        order_binance_id=order_binance_id,
-        status=OrderStatus.CANCELED,
-        binance_status=event.order_status,
-    )
+    try:
+        order: Order = db_set_order_status(
+            order_binance_id=order_binance_id,
+            status=OrderStatus.CANCELED,
+            binance_status=event.order_status,
+        )
+    except Exception as e:
+        logger.error(f"Cancel order: {e}")
+        return None
 
     # webhook = order.webhook
     # webhook_id = order.webhook.id
