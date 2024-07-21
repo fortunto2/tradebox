@@ -10,7 +10,6 @@ from flows.tasks.orders_processing import grid_make_long_limit_order
 @flow(task_runner=ConcurrentTaskRunner(), log_prints=True)
 async def open_long_position(payload: WebhookPayload, webhook_id):
     with tags(payload.symbol, webhook_id):
-        logger = get_run_logger()
 
         first_order = create_long_market_order(
             symbol=payload.symbol,

@@ -3,6 +3,7 @@ from prefect import task, flow, tags
 from prefect import flow, get_run_logger
 from prefect.task_runners import ConcurrentTaskRunner
 
+from core.logger import logger
 from flows.tasks.binance_futures import cancel_open_orders
 from core.clients.db_sync import SessionLocal
 from core.models.orders import OrderStatus, Order, OrderType
@@ -27,7 +28,6 @@ def handle_order_update(event):
 def order_filled_flow(event: OrderTradeUpdate):
     with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
         with SessionLocal() as session:
-            logger = get_run_logger()
 
             logger.info(f"Order status: {event.order_status}")
             order_binance_id = str(event.order_id)
