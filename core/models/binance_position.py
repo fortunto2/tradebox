@@ -7,7 +7,7 @@ from core.models.orders import OrderPositionSide
 
 
 class BinancePosition(SQLModel, table=True):
-    id = Field(default=None, primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     symbol: Field(str, index=True)
     position_side: OrderPositionSide
     position_qty: Decimal
