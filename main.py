@@ -5,6 +5,7 @@ import sentry_sdk
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from config import settings
 from core.clients.db_async import get_async_session, async_engine
 from core.clients.db_sync import SessionLocal, sync_engine
 # from core.clients.db_sync import sync_engine
@@ -103,7 +104,9 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 async def on_startup():
-    SQLModel.metadata.create_all(sync_engine)
+    # if sqllite in settings
+    if settings.DB_CONNECTION_STR.startswith("sqlite"):
+        SQLModel.metadata.create_all(sync_engine)
 
     #     check dual mode
     dual_mode = check_position_side_dual()
