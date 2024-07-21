@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends
 import logging
 
-import sentry_sdk
+# import sentry_sdk
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -9,17 +9,17 @@ from core.clients.db_async import get_async_session, async_engine
 from core.clients.db_sync import SessionLocal, sync_engine
 # from core.clients.db_sync import sync_engine
 from flows.open_long_potition import open_long_position
-
-sentry_sdk.init(
-    dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
-    # Set traces_sample_rate to 1.0 to capture 100%
-    # of transactions for performance monitoring.
-    traces_sample_rate=1.0,
-    # Set profiles_sample_rate to 1.0 to profile 100%
-    # of sampled transactions.
-    # We recommend adjusting this value in production.
-    profiles_sample_rate=1.0,
-)
+#
+# sentry_sdk.init(
+#     dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
+#     # Set traces_sample_rate to 1.0 to capture 100%
+#     # of transactions for performance monitoring.
+#     traces_sample_rate=1.0,
+#     # Set profiles_sample_rate to 1.0 to profile 100%
+#     # of sampled transactions.
+#     # We recommend adjusting this value in production.
+#     profiles_sample_rate=1.0,
+# )
 
 from flows.tasks.binance_futures import check_position_side_dual, check_position
 from core.models.orders import Order
