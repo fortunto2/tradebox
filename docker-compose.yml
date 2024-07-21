@@ -46,37 +46,51 @@ services:
     command: prefect worker start --pool "local"
 
 
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+#    ports:
+#      - "5432:5432"
+#    env_file:
+#      - .env
+    volumes:
+      - .docker/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=1z63W6IWWy
+      - POSTGRES_DB=tradebox
+    healthcheck:
+      test: [ 'CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}' ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
 #  pgbouncer:
 #    image: edoburu/pgbouncer:latest
 #    environment:
 #      - DB_HOST=postgres
 #      - DB_PORT=5432
-#      - DB_USER=postgres
+#      - DB_USER=1z63W6IWWy
 #      - DB_PASSWORD=dbpassword
 #      - ADMIN_USERS=postgres,admin
 #    ports:
-#      - "5432:5432"
-#
-#volumes:
-#  pgdata:
+#      - "5432:6432"
 
+  pgbouncer:
+    image: edoburu/pgbouncer
+    environment:
+      - DB_USER=postgres
+      - DB_PASSWORD=1z63W6IWWy
+      - DB_HOST=postgres
+      - DB_NAME=tradebox
+      - AUTH_TYPE=scram-sha-256 # remove/comment this line if using postgres:13 and lower
+      - POOL_MODE=transaction
+      - ADMIN_USERS=postgres,dbuser
+    ports:
+      - "5432:5432"
+    depends_on:
+      - postgres
 
-#
-#  postgres:
-#    image: postgres:15-alpine
-#    restart: always
-#    ports:
-#      - "5432:5432"
-#    env_file:
-#      - .env
-#    volumes:
-#      - .docker/postgres:/var/lib/postgresql/data
-#    environment:
-#      - POSTGRES_USER=postgres
-#      - POSTGRES_PASSWORD=1z63W6IWWy
-#      - POSTGRES_DB=tradebox
-#    healthcheck:
-#      test: [ 'CMD-SHELL', 'pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}' ]
-#      interval: 5s
-#      timeout: 5s
-#      retries: 10
+volumes:
+  pgdata:

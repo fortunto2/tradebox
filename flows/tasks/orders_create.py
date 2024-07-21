@@ -126,7 +126,7 @@ def create_long_tp_order(
         position_long, _ = check_position(symbol=symbol)
         position_long: LongPosition
 
-        tp_price = Decimal(position_long.breakEvenPrice) * (1 + Decimal(tp) / 100)
+        tp_price = Decimal(position_long.entryPrice) * (1 + Decimal(tp) / 100)
 
         take_profit_order = Order(
             position_side=OrderPositionSide.LONG,
