@@ -23,12 +23,16 @@ services:
       - '4200:4200'
     env_file:
       - .env
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200
     volumes:
       - .docker/prefect:/root/.prefect
     command: prefect server start
 
   prefect-agent:
     <<: *prefect
+    environment:
+      - PREFECT_API_URL=http://prefect-server:4200
     ports: []
     command: prefect worker start --pool "local"
 
