@@ -57,11 +57,11 @@ class OrderType(enum.Enum):
 
 class Order(BaseTable, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    webhook_id: Optional[int] = Field(default=None, foreign_key="webhook.id")
+    webhook_id: Optional[int] = Field(default=None, foreign_key="webhook.id", index=True)
     webhook: "WebHook" = Relationship(back_populates="orders")
-    binance_id: Optional[str]
+    binance_id: Optional[str] = Field(default=None, index=True)
     # todo: newClientOrderId
-    symbol: str
+    symbol: str = Field(default=None, index=True)
     side: OrderSide = OrderSide.BUY
     position_side: OrderPositionSide
     price: Optional[Decimal] = None
