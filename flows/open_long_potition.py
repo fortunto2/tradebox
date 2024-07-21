@@ -7,7 +7,7 @@ from flows.tasks.orders_create import create_long_market_order, create_long_tp_o
 from flows.tasks.orders_processing import grid_make_long_limit_order
 
 
-@flow(task_runner=ConcurrentTaskRunner(), log_prints=True)
+@flow(task_runner=ConcurrentTaskRunner())
 async def open_long_position(payload: WebhookPayload, webhook_id):
     with tags(payload.symbol, webhook_id):
 
