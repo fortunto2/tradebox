@@ -53,3 +53,4 @@ prefect config set PREFECT_API_DATABASE_CONNECTION_URL="sqlite+aiosqlite:///./pr
 3. флоу сделтаь ассинхронно - не получается, и не понятно что дает
 
 Надо! найти почему после открытия шорта не ставиться стоп ордер сверху
+db_get_order_binance_id(order_binance_id) - почемуто не находит ордер

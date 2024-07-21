@@ -171,7 +171,7 @@ def db_get_order_binance_id(order_binance_id) -> Order:
         try:
             query = select(Order).options(joinedload(Order.webhook)).where(Order.binance_id == order_binance_id)
             result = session.exec(query)
-            return result.unique().one()
+            return result.first()
         except Exception as e:
             print(f"no order in db {order_binance_id}")
             logging.error(f"Error: {e}")
