@@ -1,11 +1,10 @@
 from prefect import serve
 import sys
 
-from flows.order_cancel_flow import order_cancel_flow
-
 sys.path.append('..')
 sys.path.append('.')
 
+from flows.order_cancel_flow import order_cancel_flow
 from flows.open_long_potition import open_long_position
 from flows.order_filled_flow import order_filled_flow
 
