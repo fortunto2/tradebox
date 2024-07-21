@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     DB_CONNECTION_STR: str = "postgresql://postgres:rust_admin@localhost:5432/tradebox"
     DB_ASYNC_CONNECTION_STR: str = "postgresql+asyncpg://postgres:rust_admin@localhost:5432/tradebox"
 
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "rust_admin"
+    POSTGRES_DB: str = "tradebox"
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: str = "5432"
+
     PREFECT_API_URL: str = "http://127.0.0.1:4200/api"
 
     class Config:
