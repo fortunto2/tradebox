@@ -15,6 +15,38 @@ services:
       - "8006:8009"
     command: uvicorn main:app --reload --host 0.0.0.0 --port 8009
 
+
+  prefect-server: &prefect
+    image: prefecthq/prefect:3.0.0rc11-python3.11
+    restart: unless-stopped
+    ports:
+      - '4200:4200'
+    env_file:
+      - .env
+    volumes:
+      - .docker/prefect:/root/.prefect
+    command: prefect server start
+
+  prefect-agent:
+    <<: *prefect
+    command: prefect worker start --pool "local"
+
+
+#  pgbouncer:
+#    image: edoburu/pgbouncer:latest
+#    environment:
+#      - DB_HOST=postgres
+#      - DB_PORT=5432
+#      - DB_USER=postgres
+#      - DB_PASSWORD=dbpassword
+#      - ADMIN_USERS=postgres,admin
+#    ports:
+#      - "5432:5432"
+#
+#volumes:
+#  pgdata:
+
+
 #
 #  postgres:
 #    image: postgres:15-alpine
@@ -36,33 +68,3 @@ services:
 #      retries: 10
 
 
-  prefect-server: &prefect
-    image: prefecthq/prefect:3.0.0rc11-python3.11
-    restart: unless-stopped
-    ports:
-      - '4200:4200'
-    env_file:
-      - .env
-    volumes:
-      - .docker/prefect:/root/.prefect
-    command: prefect server start
-
-
-   prefect-agent:
-    <<: *prefect
-    command: prefect worker start --pool "local"
-
-
-#  pgbouncer:
-#    image: edoburu/pgbouncer:latest
-#    environment:
-#      - DB_HOST=postgres
-#      - DB_PORT=5432
-#      - DB_USER=postgres
-#      - DB_PASSWORD=dbpassword
-#      - ADMIN_USERS=postgres,admin
-#    ports:
-#      - "5432:5432"
-#
-#volumes:
-#  pgdata:
