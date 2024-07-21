@@ -9,6 +9,7 @@ from core.schemas.events.account_update import UpdateData
 import json
 from decimal import Decimal
 from config import get_settings
+from core.schemas.position import LongPosition, ShortPosition
 from flows.tasks.binance_futures import client, check_position
 from core.logger import logger
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
@@ -40,14 +41,16 @@ class TradeMonitor:
         listen_key = client.new_listen_key().get('listenKey')
         for symbol in self.symbols:
             position_long, position_short = check_position(symbol)
+            position_long: LongPosition
+            position_short: ShortPosition
             if position_long:
                 self.positions[symbol].long_qty = position_long.positionAmt
-                self.positions[symbol].long_entry = position_long.breakEvenPrice
+                self.positions[symbol].long_entry = position_long.entryPrice
                 logger.warning(
                     f"{symbol} +LONG -> qty: {self.positions[symbol].long_qty}, Entry price: {self.positions[symbol].long_entry}")
             if position_short:
                 self.positions[symbol].short_qty = position_short.positionAmt
-                self.positions[symbol].short_entry = position_short.breakEvenPrice
+                self.positions[symbol].short_entry = position_short.entryPrice
                 logger.warning(
                     f"{symbol} -SHORT -> qty: {self.positions[symbol].short_qty}, Entry price: {self.positions[symbol].short_entry}")
             self.client.agg_trade(symbol)
@@ -64,7 +67,7 @@ class TradeMonitor:
 
             pnl_diff = calculate_pnl(position, event)
 
-            if pnl_diff > 0:
+            if pnl_diff > 0 and position.short_qty:
                 logger.warning(f"=Profit: {pnl_diff} USDT")
                 close_position_by_pnl_flow(position, event)
 
@@ -72,13 +75,13 @@ class TradeMonitor:
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
             if event.symbol not in self.symbols:
                 return None
-            # position: SymbolPosition = self.positions[event.symbol]
+            position: SymbolPosition = self.positions[event.symbol]
 
             if event.order_status == 'FILLED':
                 if event.order_type == 'MARKET':
                     logger.warning(f"Order Market Filled: {event.order_status}, {event.order_type}")
                     return None
-                order_filled_flow(event)
+                order_filled_flow(event=event, position=position)
 
             elif event.order_status == 'CANCELED':
                 logger.warning(f"Order Canceled: {event.order_status}, {event.order_type}")

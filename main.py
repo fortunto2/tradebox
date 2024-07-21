@@ -142,7 +142,7 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     if float(position_long.entryPrice) > 0:
         print(position_long)
         print(f"Position found for symbol: {symbol}. Ignoring new webhook.")
-        return {"status": "ignored", "reason": f"position found for {symbol}"}
+        return HTTPException(status_code=400, detail=f"position found for {symbol}")
 
     # save webhook to db
     webhook = WebHook(
@@ -165,7 +165,10 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     # logging.info(f"Current price for {symbol}: {current_price}")
 
     # async to thread run
-    await open_long_position(body, webhook.id)
+    result = await open_long_position(body, webhook.id, position_long)
+    if not result:
+        return HTTPException(status_code=400, detail="Failed to open long position")
+
     await session.close()
 
     # tg.send_message(message=first_order.model_dump_json())

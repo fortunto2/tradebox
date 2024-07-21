@@ -108,10 +108,11 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
     name=f'create_order_binance',
     task_run_name='create_order_{order.side.value}_{order.type.value}'
 )
-def create_order_binance(order: Order):
+def create_order_binance(order: Order, return_full_response=False):
     """
     https://binance-docs.github.io/apidocs/futures/en/#new-order-trade
 
+    :param return_full_response:
     :param order:
     :return:
     """
@@ -144,6 +145,8 @@ def create_order_binance(order: Order):
         response = client.new_order(**order_params)
 
         logging.info(f"Order created successfully: {response}")
+        if return_full_response:
+            return response
         return str(response['orderId'])
         # except Exception as e:
         #     logging.error(f"Failed to create order: {e}")
@@ -197,7 +200,7 @@ def check_position_side_dual() -> bool:
 #     retries=3,
 #     retry_delay_seconds=5
 # )
-def check_position(symbol: str) -> (LongPosition, ShortPosition):
+def check_position(symbol: str) -> ():
     "GET /fapi/v2/positionRisk"
     """
     https://binance-docs.github.io/apidocs/futures/en/#position-information-v2-user_data

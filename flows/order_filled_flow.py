@@ -4,6 +4,7 @@ from prefect import flow, get_run_logger
 from prefect.task_runners import ConcurrentTaskRunner
 
 from core.logger import logger
+from core.models.monitor import SymbolPosition
 from flows.tasks.binance_futures import cancel_open_orders
 from core.clients.db_sync import SessionLocal
 from core.models.orders import OrderStatus, Order, OrderType
@@ -25,7 +26,7 @@ def handle_order_update(event):
 
 
 @flow(task_runner=ConcurrentTaskRunner())
-def order_filled_flow(event: OrderTradeUpdate):
+def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
     with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
         with SessionLocal() as session:
 
@@ -45,6 +46,7 @@ def order_filled_flow(event: OrderTradeUpdate):
             order.binance_id = order_binance_id
             order.status = OrderStatus.FILLED
             order.binance_status = event.order_status
+            order.price = event.average_price
 
             session.add(order)
             session.commit()
@@ -60,6 +62,7 @@ def order_filled_flow(event: OrderTradeUpdate):
 
             if order.type == OrderType.LONG_TAKE_PROFIT:
                 status_cancel = cancel_open_orders(symbol=order.symbol)
+
             elif order.type == OrderType.LONG_LIMIT:
                 logger.info(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
                 tp_order = create_long_tp_order.submit(
@@ -67,6 +70,7 @@ def order_filled_flow(event: OrderTradeUpdate):
                     tp=payload.settings.tp,
                     leverage=payload.open.leverage,
                     webhook_id=webhook_id,
+                    position=position
                 )
                 filled_orders_in_db, grid_orders, grid = check_orders_in_the_grid(
                     payload, webhook_id)
@@ -93,6 +97,7 @@ def order_filled_flow(event: OrderTradeUpdate):
                     sl_short=payload.settings.sl_short,
                     leverage=payload.open.leverage,
                     webhook_id=order.webhook_id,
+                    position=position,
                     price_original=event.original_price
                 )
                 logger.info(f"Create short_stop_loss_order: {short_stop_loss_order.id}")

@@ -6,6 +6,7 @@ from pprint import pprint
 from binance.error import ClientError
 from prefect import task
 
+from core.models.monitor import SymbolPosition
 from core.schemas.position import LongPosition, ShortPosition
 from flows.tasks.binance_futures import create_order_binance, check_position, cancel_order_binance
 from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide, OrderStatus, OrderBinanceStatus
@@ -41,7 +42,6 @@ def create_long_market_order(
         order_binance_id = create_order_binance(market_order)
         market_order.binance_id = order_binance_id
 
-        # убрать отсюад, в вебсокеты
         position_long, _ = check_position(symbol=symbol)
         position_long: LongPosition
 
@@ -60,8 +60,13 @@ def create_long_market_order(
 
 
 @task
-def create_short_market_order(symbol: str, quantity: Decimal, leverage: int, webhook_id,
-                              side: OrderSide = OrderSide.SELL):
+def create_short_market_order(
+        symbol: str,
+        quantity: Decimal,
+        leverage: int,
+        webhook_id,
+        side: OrderSide = OrderSide.SELL
+):
     def create_order(session):
         # Check existing position
         _, position_short = check_position(symbol=symbol)
@@ -81,24 +86,18 @@ def create_short_market_order(symbol: str, quantity: Decimal, leverage: int, web
             order_number=0
         )
 
-        try:
-            order_binance_id = create_order_binance(market_order)
-            market_order.binance_id = order_binance_id
+        order_binance_id = create_order_binance(market_order)
+        market_order.binance_id = order_binance_id
 
-            if position_short:
-                market_order.price = position_short.entryPrice
-                market_order.status = OrderStatus.FILLED
+        if position_short:
+            market_order.price = position_short.entryPrice
+            market_order.status = OrderStatus.FILLED
 
-            market_order.binance_status = OrderBinanceStatus.FILLED
-            session.add(market_order)
-            session.commit()
-            return market_order
-        except ClientError as e:
-            if e.code == -2022:
-                logging.error("ReduceOnly Order is rejected.")
-            else:
-                logging.error(f"Error creating order: {e}")
-            return None
+        market_order.binance_status = OrderBinanceStatus.FILLED
+        session.add(market_order)
+        session.commit()
+        return market_order
+
 
     return execute_sqlmodel_query_single(create_order)
 
@@ -108,7 +107,8 @@ def create_long_tp_order(
         symbol: str,
         tp: Decimal,
         leverage: int,
-        webhook_id
+        webhook_id,
+        position: SymbolPosition = None
 ) -> Order:
     print("Take profit order:")
 
@@ -123,17 +123,24 @@ def create_long_tp_order(
                 print(e)
                 logging.error(f"Error canceling order: {e}")
 
-        position_long, _ = check_position(symbol=symbol)
-        position_long: LongPosition
+        if not position:
+            position_long, _ = check_position(symbol=symbol)
+            position_long: LongPosition
 
-        tp_price = Decimal(position_long.entryPrice) * (1 + Decimal(tp) / 100)
+            long_entry = position_long.entryPrice
+            long_qty = position_long.positionAmt
+        else:
+            long_entry = position.long_entry
+            long_qty = position.long_qty
+
+        tp_price = Decimal(long_entry) * (1 + Decimal(tp) / 100)
 
         take_profit_order = Order(
             position_side=OrderPositionSide.LONG,
             side=OrderSide.SELL,
             type=OrderType.LONG_TAKE_PROFIT,
             symbol=symbol,
-            quantity=position_long.positionAmt,
+            quantity=long_qty,
             leverage=leverage,
             webhook_id=webhook_id,
             price=tp_price
@@ -206,21 +213,8 @@ def create_short_stop_order(
             webhook_id=webhook_id,
         )
 
-        order_binance = None
-
         order.binance_id = create_order_binance(order)
         order.status = OrderStatus.IN_PROGRESS
-
-        # while not order_binance:
-        #     try:
-        #         order_binance = get_order_id(symbol, order.binance_id)
-        #         order.binance_status = order_binance['status']
-        #     except Exception as e:
-        #         print(e)
-        #
-        #     if not order_binance:
-        #         print('!!!!Order not found, retrying')
-        #         time.sleep(5)
 
         pprint(order.model_dump())
 
@@ -237,20 +231,22 @@ def create_short_stop_loss_order(
         sl_short: float,
         leverage: int,
         webhook_id,
-        price_original: Decimal = None
+        position: SymbolPosition,
+        price_original: Decimal = None,
 ) -> Order:
     print("SHORT-BUY:")
 
     def create_order(session):
-        _, position_short = check_position(symbol=symbol)
-        position_short: ShortPosition
+        # _, position_short = check_position(symbol=symbol)
+        # position_short: ShortPosition
 
-        price_position = Decimal(position_short.entryPrice) * (1 + Decimal(sl_short) / 100)
-        quantity = abs(position_short.positionAmt)
+        price_position = Decimal(position.short_entry) * (1 + Decimal(sl_short) / 100)
+        quantity = abs(position.short_qty)
         print('price:', price_position)
         print('quantity:', quantity)
 
         if price_original < price_position:
+            # todo: смотря по какой цене выставили, если не успели надо проверить выставился ли он или нет, если нет еще раз переставить
 
             order = Order(
                 position_side=OrderPositionSide.SHORT,

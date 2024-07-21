@@ -27,14 +27,14 @@ def close_position_by_pnl_flow(position: SymbolPosition, event: AggregatedTradeE
             quantity=abs(position.short_qty),
             leverage=leverage,
             webhook_id=webhook.id,
-            side=OrderSide.BUY,
+            side=OrderSide.BUY
         )
         create_long_market_order.submit(
             symbol=event.symbol,
             quantity=position.long_qty,
             leverage=leverage,
             webhook_id=webhook.id,
-            side=OrderSide.SELL,
+            side=OrderSide.SELL
         )
 
         # save_position(event.symbol, "LONG", long_position_qty, long_entry_price, long_pnl)
