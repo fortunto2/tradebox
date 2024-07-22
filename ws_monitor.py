@@ -3,6 +3,7 @@ from typing import List, Dict
 from pydantic import BaseModel, Field
 
 from core.models.monitor import TradeMonitorBase, SymbolPosition
+from core.models.orders import OrderType
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.schemas.events.account_update import UpdateData
@@ -76,6 +77,14 @@ class TradeMonitor:
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
             if event.symbol not in self.symbols:
                 return None
+
+            our_order_type = None
+            # choise from OrderType by event
+            if event.position_side == 'SHORT' and event.side == 'SELL' and event.order_type == 'STOP':
+                our_order_type = OrderType.SHORT_LIMIT
+            elif event.position_side == 'SHORT' and event.side == 'BUY' and event.order_type == 'STOP':
+                our_order_type = OrderType.SHORT_STOP_LOSS
+
             position: SymbolPosition = self.positions[event.symbol]
             logger.info(event.symbol, event.order_id, event.order_type, event.order_status, event.position_side, event.side)
 
@@ -95,7 +104,8 @@ class TradeMonitor:
                 logger.warning(f"Order Expired: {event.order_status}, {event.order_type}")
             elif event.order_status == 'NEW':
                 logger.warning(f"Order New: {event.order_status}, {event.order_type}")
-                order_new_flow(event)
+                if our_order_type:
+                    order_new_flow(event, our_order_type)
 
         elif event_type == 'ACCOUNT_UPDATE':
             event = UpdateData.parse_obj(message_dict['a'])
