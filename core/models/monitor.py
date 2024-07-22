@@ -11,6 +11,7 @@ class SymbolPosition(BaseModel):
     short_entry: Decimal = Field(default_factory=lambda: Decimal(0))
     long_pnl: Decimal = Field(default_factory=lambda: Decimal(0))
     short_pnl: Decimal = Field(default_factory=lambda: Decimal(0))
+    closed: bool = False
 
 
 class TradeMonitorBase:

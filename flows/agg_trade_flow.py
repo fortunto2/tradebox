@@ -37,5 +37,7 @@ def close_position_by_pnl_flow(position: SymbolPosition, event: AggregatedTradeE
             side=OrderSide.SELL
         )
 
+        return True
+
         # save_position(event.symbol, "LONG", long_position_qty, long_entry_price, long_pnl)
         # save_position(event.symbol, "SHORT", short_position_qty, short_entry_price, short_pnl)

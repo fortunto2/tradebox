@@ -69,9 +69,9 @@ class TradeMonitor:
 
             pnl_diff = calculate_pnl(position, event)
 
-            if pnl_diff > 0 and position.short_qty:
+            if pnl_diff > 0.25 and position.short_qty and not position.closed:
                 logger.warning(f"=Profit: {pnl_diff} USDT")
-                close_position_by_pnl_flow(position, event)
+                position.closed = close_position_by_pnl_flow(position, event)
 
         elif event_type == 'ORDER_TRADE_UPDATE':
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
@@ -86,7 +86,6 @@ class TradeMonitor:
                 our_order_type = OrderType.SHORT_STOP_LOSS
 
             position: SymbolPosition = self.positions[event.symbol]
-            logger.info(event.symbol, event.order_id, event.order_type, event.order_status, event.position_side, event.side)
 
             if event.order_status == 'FILLED':
                 if event.order_type == 'MARKET':
