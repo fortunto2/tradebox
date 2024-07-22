@@ -53,7 +53,7 @@ class WebhookPayload(BaseModel):
             v = v.upper()
         if v in OrderSide.__members__:
             return OrderSide[v]
-        elif v in OrderSide:
+        if isinstance(v, OrderSide):
             return v
         raise ValueError('Invalid value for side')
 
@@ -63,6 +63,6 @@ class WebhookPayload(BaseModel):
             v = v.upper()
         if v in OrderPositionSide.__members__:
             return OrderPositionSide[v]
-        elif v in OrderPositionSide:
+        if isinstance(v, OrderPositionSide):
             return v
         raise ValueError('Invalid value for positionSide')
