@@ -48,7 +48,6 @@ def open_short_position_loop(
         webhook_id=webhook_id,
     )
 
-    return hedge_stop_order.binance_id
 
 
 def get_grid_orders(
