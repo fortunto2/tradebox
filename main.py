@@ -133,6 +133,9 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
 
     body.symbol = symbol
 
+    if not body.positionSide:
+        return HTTPException(status_code=400, detail="positionSide is required (short or long)")
+
     # todo: check if position already exists in db
     # если слишком быстро пришло много вебхуков на один символ, все отработают
 

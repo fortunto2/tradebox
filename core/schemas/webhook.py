@@ -42,7 +42,7 @@ class Settings(BaseModel):
 class WebhookPayload(BaseModel):
     name: str
     side: OrderSide
-    positionSide: OrderPositionSide
+    positionSide: Optional[OrderPositionSide] = None
     symbol: str
     open: OpenOrder
     settings: Settings
@@ -60,6 +60,8 @@ class WebhookPayload(BaseModel):
     @field_validator('positionSide', mode='before')
     def validate_position_side(cls, v):
         if isinstance(v, str):
+            if v == 'flat':
+                return None
             v = v.upper()
         if v in OrderPositionSide.__members__:
             return OrderPositionSide[v]
