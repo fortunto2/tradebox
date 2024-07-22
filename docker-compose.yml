@@ -14,11 +14,16 @@ services:
     ports:
       - "8006:8009"
     command: uvicorn main:app --reload --host 0.0.0.0 --port 8009 --forwarded-allow-ips='*' --proxy-headers
+    healthcheck:
+      test: wget --no-verbose -O /dev/null --tries=1 http://0.0.0.0:8009/ping || exit 1
+      interval: 1s
+      timeout: 5s
 
   ws-monitor:
     <<: *backend
     ports: []
     command: python ws_monitor.py --symbol=1000FLOKIUSDT
+    healthcheck: null
 
 
   prefect-server: &prefect

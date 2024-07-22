@@ -36,7 +36,7 @@ logging.basicConfig(level=logging.INFO)
 
 import logging
 
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from fastapi import Request, HTTPException
 from fastapi.exceptions import RequestValidationError
@@ -177,6 +177,12 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     # tg.send_message(message=first_order.model_dump_json())
 
     return {"status": "success"}
+
+
+@app.get('/ping', response_class=Response)
+async def ping():
+    return Response(status_code=200)
+
 
 
 if __name__ == "__main__":
