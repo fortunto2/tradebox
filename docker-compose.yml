@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: revolutionapi/tradebox
-    restart: on-failure
+    restart: always
     volumes:
       - .:/app
     env_file:
@@ -23,7 +23,7 @@ services:
 
   prefect-server: &prefect
     image: prefecthq/prefect:2.19.8-python3.11
-    restart: unless-stopped
+    restart: always
     ports:
       - '4200:4200'
     env_file:
@@ -60,6 +60,7 @@ services:
 
   pgbouncer:
     image: edoburu/pgbouncer
+    restart: always
     environment:
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
