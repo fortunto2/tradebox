@@ -23,7 +23,7 @@ services:
     <<: *backend
     ports: []
     command: python ws_monitor.py --symbol=1000FLOKIUSDT
-    healthcheck: null
+    healthcheck: []
 
 
   prefect-server: &prefect
