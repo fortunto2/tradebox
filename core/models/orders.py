@@ -52,7 +52,9 @@ class OrderType(enum.Enum):
     LONG_TAKE_PROFIT = "LONG_TAKE_PROFIT"
     # our custom
     SHORT_LIMIT = "SHORT_LIMIT"
-    SHORT_STOP_LOSS = "SHORT_STOP_LOSS"
+    # SHORT_STOP_LOSS = "SHORT_STOP_LOSS" # depricated, switch to SHORT_MARKET_STOP_LOSS
+    SHORT_MARKET_STOP_LOSS = "SHORT_MARKET_STOP_LOSS"
+    SHORT_MARKET_STOP_OPEN = "SHORT_MARKET_STOP_OPEN"
 
 
 class Order(BaseTable, table=True):

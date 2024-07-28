@@ -10,7 +10,7 @@ from core.schemas.webhook import WebhookPayload
 from core.views.handle_orders import db_get_last_order, db_get_orders
 from core.grid import update_grid
 from flows.tasks.orders_create import create_long_limit_order, \
-    create_short_stop_order
+    create_short_market_stop_order
 from core.clients.db_sync import execute_sqlmodel_query, execute_sqlmodel_query_single
 
 
@@ -20,7 +20,6 @@ def open_short_position_loop(
         webhook_id,
         order_binance_id: str,
 ):
-
 
     pnl = get_position_closed_pnl(payload.symbol, int(order_binance_id))
     print("pnl:", pnl)
@@ -40,7 +39,7 @@ def open_short_position_loop(
     quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
 
     # только один раз, когда хватает денег
-    hedge_stop_order = create_short_stop_order.submit(
+    hedge_stop_order = create_short_market_stop_order.submit(
         symbol=payload.symbol,
         price=hedge_price,
         quantity=quantity,
@@ -146,7 +145,7 @@ def grid_make_long_limit_order(
 
             time.sleep(0.5)
 
-            create_short_stop_order.submit(
+            create_short_market_stop_order.submit(
                 symbol=payload.symbol,
                 price=short_order_price,
                 quantity=short_order_amount,

@@ -11,7 +11,7 @@ from core.models.orders import OrderStatus, Order, OrderType
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.schemas.webhook import WebhookPayload
 from core.views.handle_orders import db_get_order_binance_id, get_webhook_last
-from flows.tasks.orders_create import create_short_stop_loss_order, create_long_tp_order
+from flows.tasks.orders_create import create_short_market_stop_loss_order, create_long_tp_order
 from flows.tasks.orders_processing import open_short_position_loop, grid_make_long_limit_order, check_orders_in_the_grid
 
 
@@ -88,7 +88,7 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
                     logger.info(f"stop: filled_orders {len(grid)} <= grid_orders {len(filled_orders_in_db)}")
 
 
-            elif order.type == OrderType.SHORT_STOP_LOSS:
+            elif order.type == OrderType.SHORT_MARKET_STOP_LOSS:
                 logger.info(f"Order {order_binance_id} HEDGE_STOP_LOSS start make_hedge_by_pnl")
                 open_short_position_loop(
                     payload=payload,
@@ -96,7 +96,7 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
                     order_binance_id=order_binance_id,
                 )
             elif order.type == OrderType.SHORT_LIMIT:
-                short_stop_loss_order = create_short_stop_loss_order(
+                short_stop_loss_order = create_short_market_stop_loss_order(
                     symbol=payload.symbol,
                     sl_short=payload.settings.sl_short,
                     leverage=payload.open.leverage,

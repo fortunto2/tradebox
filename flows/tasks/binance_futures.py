@@ -137,7 +137,7 @@ def create_order_binance(order: Order, return_full_response=False):
             order_params["stopPrice"] = price
             order_params["price"] = price
             order_params["type"] = 'STOP'
-        elif order.type == OrderType.SHORT_STOP_LOSS:
+        elif order.type in [OrderType.SHORT_MARKET_STOP_LOSS, OrderType.SHORT_MARKET_STOP_OPEN]:
             order_params["stopPrice"] = price
             order_params["type"] = 'STOP_MARKET'
         else:

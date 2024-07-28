@@ -191,7 +191,7 @@ def create_long_limit_order(
 
 
 @task
-def create_short_stop_order(
+def create_short_market_stop_order(
         symbol: str,
         price: Decimal,
         quantity: Decimal,
@@ -205,7 +205,7 @@ def create_short_stop_order(
         order = Order(
             position_side=OrderPositionSide.SHORT,
             side=OrderSide.SELL,
-            type=OrderType.SHORT_LIMIT,
+            type=OrderType.SHORT_MARKET_STOP_OPEN,
             symbol=symbol,
             price=price,
             quantity=quantity,
@@ -226,7 +226,7 @@ def create_short_stop_order(
 
 
 @task
-def create_short_stop_loss_order(
+def create_short_market_stop_loss_order(
         symbol: str,
         sl_short: float,
         leverage: int,
@@ -237,38 +237,22 @@ def create_short_stop_loss_order(
     print("SHORT-BUY:")
 
     def create_order(session):
-        # _, position_short = check_position(symbol=symbol)
-        # position_short: ShortPosition
 
         price_position = Decimal(position.short_entry) * (1 + Decimal(sl_short) / 100)
         quantity = abs(position.short_qty)
         print('price:', price_position)
         print('quantity:', quantity)
 
-        if price_original < price_position:
-            # todo: смотря по какой цене выставили, если не успели надо проверить выставился ли он или нет, если нет еще раз переставить
-
-            order = Order(
-                position_side=OrderPositionSide.SHORT,
-                side=OrderSide.BUY,
-                type=OrderType.SHORT_STOP_LOSS,
-                symbol=symbol,
-                price=price_position,
-                quantity=quantity,
-                leverage=leverage,
-                webhook_id=webhook_id,
-            )
-        else:
-            order = Order(
-                position_side=OrderPositionSide.SHORT,
-                side=OrderSide.BUY,
-                type=OrderType.SHORT_MARKET,
-                symbol=symbol,
-                quantity=quantity,
-                leverage=leverage,
-                webhook_id=webhook_id,
-                order_number=0
-            )
+        order = Order(
+            position_side=OrderPositionSide.SHORT,
+            side=OrderSide.BUY,
+            type=OrderType.SHORT_MARKET_STOP_LOSS,
+            symbol=symbol,
+            price=price_position,
+            quantity=quantity,
+            leverage=leverage,
+            webhook_id=webhook_id,
+        )
 
         try:
             order.binance_id = create_order_binance(order)
