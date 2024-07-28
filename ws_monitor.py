@@ -84,20 +84,10 @@ class TradeMonitor:
             if event.symbol not in self.symbols:
                 return None
 
-            our_order_type = None
-            # todo: сделать сюда все типы наш-бинанс, и проверку вначале делать чтоб такого ордера в базе нет
-            # choise from OrderType by event
-            if event.position_side == 'SHORT' and event.side == 'SELL' and event.order_type == 'STOP':
-                our_order_type = OrderType.SHORT_LIMIT
-            elif event.order_type == 'STOP_MARKET' and event.side == 'SELL':
-                our_order_type = OrderType.SHORT_MARKET_STOP_OPEN
-            elif event.order_type == 'STOP_MARKET' and event.side == 'BUY':
-                our_order_type = OrderType.SHORT_MARKET_STOP_LOSS
-
             position: SymbolPosition = self.positions[event.symbol]
 
             if event.order_status == 'FILLED':
-                if event.order_type == 'MARKET':
+                if event.order_type == 'MARKET' and event.position_side == 'LONG':
                     logger.warning(f"Order Market Filled: {event.order_status}, {event.order_type}")
                     return None
                 order_filled_flow(event=event, position=position)
@@ -112,6 +102,17 @@ class TradeMonitor:
                 logger.warning(f"Order Expired: {event.order_status}, {event.order_type}")
             elif event.order_status == 'NEW':
                 logger.warning(f"Order New: {event.order_status}, {event.order_type}")
+
+                our_order_type = None
+                # todo: сделать сюда все типы наш-бинанс, и проверку вначале делать чтоб такого ордера в базе нет
+                # choise from OrderType by event
+                if event.position_side == 'SHORT' and event.side == 'SELL' and event.order_type == 'STOP':
+                    our_order_type = OrderType.SHORT_LIMIT
+                elif event.order_type == 'STOP_MARKET' and event.side == 'SELL':
+                    our_order_type = OrderType.SHORT_MARKET_STOP_OPEN
+                elif event.order_type == 'STOP_MARKET' and event.side == 'BUY':
+                    our_order_type = OrderType.SHORT_MARKET_STOP_LOSS
+
                 if our_order_type:
                     order_new_flow(event, our_order_type)
 
