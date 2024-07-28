@@ -89,13 +89,13 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
 
 
             elif order.type == OrderType.SHORT_MARKET_STOP_LOSS:
-                logger.info(f"Order {order_binance_id} HEDGE_STOP_LOSS start make_hedge_by_pnl")
+                logger.info(f"Order {order_binance_id} SHORT_MARKET_STOP_LOSS start make_hedge_by_pnl")
                 open_short_position_loop(
                     payload=payload,
                     webhook_id=order.webhook_id,
                     order_binance_id=order_binance_id,
                 )
-            elif order.type == OrderType.SHORT_LIMIT:
+            elif order.type == OrderType.SHORT_LIMIT or order.type == OrderType.SHORT_MARKET_STOP_OPEN:
                 short_stop_loss_order = create_short_market_stop_loss_order(
                     symbol=payload.symbol,
                     sl_short=payload.settings.sl_short,

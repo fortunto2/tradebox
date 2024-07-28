@@ -17,6 +17,11 @@ def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
 
     webhook = get_webhook_last(event.symbol)
 
+    order: Order = db_get_order_binance_id(order_binance_id)
+    if order:
+        logger.error(f"Order already exists in DB - {order_binance_id}")
+        return None
+
     with SessionLocal() as session:
 
         order: Order = Order(
