@@ -133,10 +133,13 @@ def create_order_binance(order: Order, return_full_response=False):
 
         if order.type == OrderType.LONG_MARKET or order.type == OrderType.SHORT_MARKET:
             order_params["type"] = 'MARKET'
-        elif order.type in [OrderType.SHORT_LIMIT, OrderType.SHORT_STOP_LOSS]:
+        elif order.type == OrderType.SHORT_LIMIT:
             order_params["stopPrice"] = price
             order_params["price"] = price
             order_params["type"] = 'STOP'
+        elif order.type == OrderType.SHORT_STOP_LOSS:
+            order_params["stopPrice"] = price
+            order_params["type"] = 'STOP_MARKET'
         else:
             order_params["price"] = price
             order_params["timeInForce"] = "GTC"
