@@ -91,7 +91,9 @@ class TradeMonitor:
             elif event.position_side == 'SHORT' and event.side == 'BUY' and event.order_type == 'STOP':
                 # todo: depricated, use STOP_MARKET
                 our_order_type = OrderType.SHORT_MARKET_STOP_LOSS
-            elif event.order_type == 'STOP_MARKET':
+            elif event.order_type == 'STOP_MARKET' and event.side == 'SELL':
+                our_order_type = OrderType.SHORT_MARKET_STOP_OPEN
+            elif event.order_type == 'STOP_MARKET' and event.side == 'BUY':
                 our_order_type = OrderType.SHORT_MARKET_STOP_LOSS
 
             position: SymbolPosition = self.positions[event.symbol]
