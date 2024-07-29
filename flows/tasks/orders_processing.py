@@ -24,7 +24,7 @@ def open_short_position_loop(
     pnl = get_position_closed_pnl(payload.symbol, int(order_binance_id))
     print("pnl:", pnl)
 
-    extramarg = Decimal(payload.settings.extramarg) + pnl
+    extramarg = Decimal(payload.settings.extramarg) - abs(pnl)
 
     if extramarg * Decimal(payload.open.leverage) < 11:
         # проверку что не extramarg не должен быть менее 11 долларов * плече
@@ -32,7 +32,7 @@ def open_short_position_loop(
         return
 
     short_order: Order = execute_sqlmodel_query_single(
-        lambda session: db_get_last_order(webhook_id, order_type=OrderType.SHORT_MARKET_STOP_OPEN, order_by='desk'))
+        lambda session: db_get_last_order(webhook_id, order_type=OrderType.SHORT_MARKET_STOP_OPEN, order_by='desc'))
 
     hedge_price = Decimal(short_order.price) * (1 - Decimal(payload.settings.offset_pluse) / 100)
 
