@@ -10,6 +10,7 @@
     "leverage": "25"
   },
   "settings": {
+    "start": 1,
     "deposit": 5.0,
     "extramarg": 5.0,
     "tp": "1.06",

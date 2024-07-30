@@ -126,6 +126,9 @@ async def on_startup():
 async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(get_async_session)):
     logging.info(f"Received webhook JSON payload: {body.json()}")
 
+    if not body.settings.start:
+        return HTTPException(status_code=400, detail="Skip start 0")
+
     symbol = body.symbol
     # if last characher in symbol P, remove it
     if symbol[-2:] == '.P':

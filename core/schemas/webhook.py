@@ -16,6 +16,7 @@ class OpenOrder(BaseModel):
 
 
 class Settings(BaseModel):
+    start: bool
     deposit: float
     time_allert: Optional[datetime] = None
     extramarg: float
