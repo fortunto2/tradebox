@@ -5,7 +5,7 @@ from prefect.task_runners import ConcurrentTaskRunner
 
 from core.logger import logger
 from core.models.monitor import SymbolPosition
-from flows.tasks.binance_futures import cancel_open_orders
+from flows.agg_trade_flow import close_position_by_pnl_flow
 from core.clients.db_sync import SessionLocal
 from core.models.orders import OrderStatus, Order, OrderType
 from core.schemas.events.order_trade_update import OrderTradeUpdate
@@ -65,7 +65,10 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
             )
 
             if order.type == OrderType.LONG_TAKE_PROFIT:
-                status_cancel = cancel_open_orders(symbol=order.symbol)
+                close_position_by_pnl_flow(
+                    position=position,
+                    event=event
+                )
 
             elif order.type == OrderType.LONG_LIMIT:
                 logger.info(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
