@@ -181,7 +181,8 @@ import click
 @click.option("--symbol", prompt="Symbol", default="1000FLOKIUSDT", show_default=True,
               help="Enter the trading symbol (default: 1000FLOKIUSDT)")
 def main(symbol):
-    symbols = ['UNFIUSDT', '1000FLOKIUSDT']
+
+    symbols = ['UNFIUSDT', '1000FLOKIUSDT', '1000LUNCUSDT', '1000SHIBUSDT', '1000XECUSDT', '1INCHUSDT']
     check_orders(symbols)
     trade_monitor = TradeMonitor(symbols)
     trade_monitor.start_monitor_events()
