@@ -15,7 +15,7 @@ from flows.order_new_flow import order_new_flow
 from flows.tasks.binance_futures import client, check_position
 from core.logger import logger
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
-from flows.agg_trade_flow import close_position_by_pnl_flow
+from flows.agg_trade_flow import close_positions
 from flows.order_filled_flow import order_filled_flow
 from flows.order_cancel_flow import order_cancel_flow
 
@@ -71,7 +71,7 @@ class TradeMonitor:
 
             if pnl_diff > 0.25 and position.short_qty:
                 logger.warning(f"=Profit: {pnl_diff} USDT")
-                close_position_by_pnl_flow(position, event)
+                close_positions(position, event.symbol)
                 self.positions[event.symbol] = SymbolPosition(
                     long_qty=0,
                     long_entry=0,

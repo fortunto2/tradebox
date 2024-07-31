@@ -11,20 +11,20 @@ from flows.tasks.orders_create import create_short_market_order, create_long_mar
 
 
 @flow(task_runner=ConcurrentTaskRunner())
-def close_position_by_pnl_flow(position: SymbolPosition, event: AggregatedTradeEvent, close_short=True, close_long=True):
+def close_positions(position: SymbolPosition, symbol: str, close_short=True, close_long=True):
 
-    with tags(event.symbol):
+    with tags(symbol):
         logger = get_run_logger()
 
-        status_cancel = cancel_open_orders(symbol=event.symbol)
-        webhook = get_webhook_last(event.symbol)
+        status_cancel = cancel_open_orders(symbol=symbol)
+        webhook = get_webhook_last(symbol)
         leverage = webhook.open.get('leverage', webhook.open['leverage'])
 
         logger.info(f">>> Cancel all open orders: {status_cancel}")
 
         if close_short:
             create_short_market_order.submit(
-                symbol=event.symbol,
+                symbol=symbol,
                 quantity=abs(position.short_qty),
                 leverage=leverage,
                 webhook_id=webhook.id,
@@ -32,7 +32,7 @@ def close_position_by_pnl_flow(position: SymbolPosition, event: AggregatedTradeE
             )
         if close_long:
             create_long_market_order.submit(
-                symbol=event.symbol,
+                symbol=symbol,
                 quantity=position.long_qty,
                 leverage=leverage,
                 webhook_id=webhook.id,

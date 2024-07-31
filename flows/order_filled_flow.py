@@ -5,7 +5,8 @@ from prefect.task_runners import ConcurrentTaskRunner
 
 from core.logger import logger
 from core.models.monitor import SymbolPosition
-from flows.agg_trade_flow import close_position_by_pnl_flow
+from core.schemas.events.agg_trade import AggregatedTradeEvent
+from flows.agg_trade_flow import close_positions
 from core.clients.db_sync import SessionLocal
 from core.models.orders import OrderStatus, Order, OrderType
 from core.schemas.events.order_trade_update import OrderTradeUpdate
@@ -65,9 +66,10 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
             )
 
             if order.type == OrderType.LONG_TAKE_PROFIT:
-                close_position_by_pnl_flow(
+
+                close_positions(
                     position=position,
-                    event=event,
+                    symbol=event.symbol,
                     close_long=False, #closed by TP order
                     close_short=True
                 )
