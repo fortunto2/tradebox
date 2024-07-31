@@ -67,7 +67,9 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
             if order.type == OrderType.LONG_TAKE_PROFIT:
                 close_position_by_pnl_flow(
                     position=position,
-                    event=event
+                    event=event,
+                    close_long=False, #closed by TP order
+                    close_short=True
                 )
 
             elif order.type == OrderType.LONG_LIMIT:
