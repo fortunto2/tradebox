@@ -48,11 +48,13 @@ class TradeMonitor:
             if position_long:
                 self.positions[symbol].long_qty = position_long.positionAmt
                 self.positions[symbol].long_entry = position_long.entryPrice
+                self.positions[symbol].long_break_even_price = position_long.breakEvenPrice
                 logger.warning(
                     f"{symbol} +LONG -> qty: {self.positions[symbol].long_qty}, Entry price: {self.positions[symbol].long_entry}")
             if position_short:
                 self.positions[symbol].short_qty = position_short.positionAmt
                 self.positions[symbol].short_entry = position_short.entryPrice
+                self.positions[symbol].short_break_even_price = position_short.breakEvenPrice
                 logger.warning(
                     f"{symbol} -SHORT -> qty: {self.positions[symbol].short_qty}, Entry price: {self.positions[symbol].short_entry}")
             self.client.agg_trade(symbol)
@@ -67,16 +69,20 @@ class TradeMonitor:
             event = AggregatedTradeEvent.parse_obj(message_dict)
             position: SymbolPosition = self.positions[event.symbol]
 
-            pnl_diff = calculate_pnl(position, event)
+            pnl_diff = calculate_pnl(position, Decimal(event.price))
 
-            if pnl_diff > 0.25 and position.short_qty:
+            if pnl_diff > 0 and position.short_qty:
                 logger.warning(f"=Profit: {pnl_diff} USDT")
                 close_positions(position, event.symbol)
                 self.positions[event.symbol] = SymbolPosition(
                     long_qty=0,
                     long_entry=0,
+                    long_break_even_price=0,
+                    long_adjusted_break_even_price=0,
                     short_qty=0,
-                    short_entry=0
+                    short_entry=0,
+                    short_break_even_price=0,
+                    short_adjusted_break_even_price=0,
                 )
 
         elif event_type == 'ORDER_TRADE_UPDATE':
@@ -132,7 +138,8 @@ class TradeMonitor:
                     logger.warning(
                         f"Changed position in {symbol} from {self.positions[symbol].long_qty} to {position.position_amount}")
                 self.positions[symbol].long_qty = Decimal(position.position_amount)
-                self.positions[symbol].long_entry = Decimal(position.breakeven_price)
+                self.positions[symbol].long_entry = Decimal(position.entry_price)
+                self.positions[symbol].long_break_even_price = Decimal(position.breakeven_price)
                 logger.info(f'UPDATE Long PNL: {position.unrealized_pnl}')
                 logger.info(position)
 
@@ -141,21 +148,21 @@ class TradeMonitor:
                     logger.warning(
                         f"Changed position in {symbol} from {self.positions[symbol].short_qty} to {position.position_amount}")
                 self.positions[symbol].short_qty = Decimal(position.position_amount)
-                self.positions[symbol].short_entry = Decimal(position.breakeven_price)
+                self.positions[symbol].short_entry = Decimal(position.entry_price)
+                self.positions[symbol].short_break_even_price = Decimal(position.breakeven_price)
                 logger.info(f'UPDATE Short PNL: {position.unrealized_pnl}')
                 logger.info(position)
 
 
-def calculate_pnl(position: SymbolPosition, event: AggregatedTradeEvent):
-    trade_price = Decimal(event.price)
+def calculate_pnl(position: SymbolPosition, current_price: Decimal):
     long_pnl = 0
     short_pnl = 0
 
     if position.long_qty != 0:
-        long_pnl = round((trade_price - position.long_entry) * position.long_qty, 2)
+        long_pnl = position.calculate_pnl_long(current_price)
 
     if position.short_qty != 0:
-        short_pnl = round((trade_price - position.short_entry) * position.short_qty, 2)
+        short_pnl = position.calculate_pnl_short(current_price)
 
     return round(long_pnl + short_pnl, 2)
 
