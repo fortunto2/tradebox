@@ -2,8 +2,9 @@ from typing import List, Dict
 
 from pydantic import BaseModel, Field
 
+from core.models.binance_position import PositionStatus, BinancePosition
 from core.models.monitor import TradeMonitorBase, SymbolPosition
-from core.models.orders import OrderType
+from core.models.orders import OrderType, OrderPositionSide, Order
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.schemas.events.account_update import UpdateData
@@ -11,8 +12,10 @@ import json
 from decimal import Decimal
 from config import get_settings
 from core.schemas.position import LongPosition, ShortPosition
+from core.views.handle_orders import get_webhook_last, db_get_order_binance_position_id
+from core.views.handle_positions import get_exist_position
 from flows.order_new_flow import order_new_flow
-from flows.tasks.binance_futures import client, check_position
+from flows.tasks.binance_futures import client, check_position, get_order_id
 from core.logger import logger
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
 from flows.agg_trade_flow import close_positions
@@ -74,16 +77,6 @@ class TradeMonitor:
             if pnl_diff > 0 and position.short_qty:
                 logger.warning(f"=Profit: {pnl_diff} USDT")
                 close_positions(position, event.symbol)
-                self.positions[event.symbol] = SymbolPosition(
-                    long_qty=0,
-                    long_entry=0,
-                    long_break_even_price=0,
-                    long_adjusted_break_even_price=0,
-                    short_qty=0,
-                    short_entry=0,
-                    short_break_even_price=0,
-                    short_adjusted_break_even_price=0,
-                )
 
         elif event_type == 'ORDER_TRADE_UPDATE':
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
@@ -92,11 +85,33 @@ class TradeMonitor:
 
             position: SymbolPosition = self.positions[event.symbol]
 
+            our_order_type = None
+            # todo: сделать сюда все типы наш-бинанс, и проверку вначале делать чтоб такого ордера в базе нет
+            # choise from OrderType by event
+            if event.position_side == 'SHORT' and event.side == 'SELL' and event.order_type == 'STOP':
+                our_order_type = OrderType.SHORT_LIMIT
+            elif event.order_type == 'STOP_MARKET' and event.side == 'SELL':
+                our_order_type = OrderType.SHORT_MARKET_STOP_OPEN
+            elif event.order_type == 'STOP_MARKET' and event.side == 'BUY':
+                our_order_type = OrderType.SHORT_MARKET_STOP_LOSS
+            elif event.order_type == 'MARKET' and event.position_side == 'SHORT':
+                our_order_type = OrderType.SHORT_MARKET
+            elif event.order_type == 'MARKET' and event.position_side == 'LONG':
+                our_order_type = OrderType.LONG_MARKET
+            # elif event.order_type == 'LIMIT' and event.position_side == 'LONG':
+            #     our_order_type = OrderType.LONG_TAKE_PROFIT
+            elif event.order_type == 'LIMIT' and event.position_side == 'LONG':
+                our_order_type = OrderType.LONG_LIMIT
+            elif event.order_type == 'LIMIT' and event.position_side == 'SHORT':
+                our_order_type = OrderType.SHORT_LIMIT
+
             if event.order_status == 'FILLED':
-                if event.order_type == 'MARKET' and event.position_side == 'LONG':
-                    logger.warning(f"Order Market Filled: {event.order_status}, {event.order_type}")
-                    return None
-                order_filled_flow(event=event, position=position)
+                # if event.order_type == 'MARKET' and event.position_side == 'LONG':
+                #     logger.warning(f"Order Market Filled: {event.order_status}, {event.order_type}")
+                #     return None
+                filled_order = order_filled_flow(event=event, position=position, order_type=our_order_type)
+                if not filled_order:
+                    order_new_flow(event, our_order_type)
 
             elif event.order_status == 'CANCELED':
                 logger.warning(f"Order Canceled: {event.order_status}, {event.order_type}")
@@ -109,16 +124,6 @@ class TradeMonitor:
             elif event.order_status == 'NEW':
                 logger.warning(f"Order New: {event.order_status}, {event.order_type}")
 
-                our_order_type = None
-                # todo: сделать сюда все типы наш-бинанс, и проверку вначале делать чтоб такого ордера в базе нет
-                # choise from OrderType by event
-                if event.position_side == 'SHORT' and event.side == 'SELL' and event.order_type == 'STOP':
-                    our_order_type = OrderType.SHORT_LIMIT
-                elif event.order_type == 'STOP_MARKET' and event.side == 'SELL':
-                    our_order_type = OrderType.SHORT_MARKET_STOP_OPEN
-                elif event.order_type == 'STOP_MARKET' and event.side == 'BUY':
-                    our_order_type = OrderType.SHORT_MARKET_STOP_LOSS
-
                 if our_order_type:
                     order_new_flow(event, our_order_type)
 
@@ -127,31 +132,131 @@ class TradeMonitor:
             self.handle_account_update(event)
 
     def handle_account_update(self, event: UpdateData):
+        from core.schemas.events.base import Balance, Position
+        from core.views.handle_positions import save_position
+
+        webhook_id = get_webhook_last(event.positions[0].symbol).id
+
         for position in event.positions:
             symbol = position.symbol
+            position: Position
 
             if symbol not in self.positions:
                 continue
 
             if position.position_side == 'LONG':
-                if position.position_amount != self.positions[symbol].long_qty:
+
+                # если значения с 0 увеличилось, то это открытие позиции и отправляем в базу
+                # если уменьшилось до 0 - закрытие позиции
+                # или просто обновили если не 0
+                status = PositionStatus.OPEN
+
+                if position.position_amount != 0 and self.positions[symbol].long_qty == 0:
+                    # open
+                    logger.warning(f"Open position in {symbol} with {position.position_amount} amount")
+
+                elif position.position_amount == 0:
+                    # close
+                    logger.warning(f"Close position in {symbol} with {position.position_amount} amount")
+                    status = PositionStatus.CLOSED
+
+                    position_binance = get_exist_position(
+                        symbol=symbol,
+                        webhook_id=webhook_id,
+                        position_side=OrderPositionSide.LONG,
+                        check_closed=False
+                    )
+                    if position_binance:
+                        last_orders: Order = db_get_order_binance_position_id(position_binance.id)
+                        # if last_orders:
+                        #     self.positions[symbol].long_pnl = self.positions[symbol].calculate_pnl_long(last_orders[0].price)
+                        # else:
+                        order_binance = get_order_id(symbol, last_orders[0].binance_id)
+                        if order_binance:
+                            self.positions[symbol].long_pnl = self.positions[symbol].calculate_pnl_long(Decimal(order_binance.get('avgPrice')))
+
+                else:
                     logger.warning(
                         f"Changed position in {symbol} from {self.positions[symbol].long_qty} to {position.position_amount}")
-                self.positions[symbol].long_qty = Decimal(position.position_amount)
+
+                    status = PositionStatus.UPDATED
+
+                self.positions[symbol].long_qty = Decimal(abs(position.position_amount))
                 self.positions[symbol].long_entry = Decimal(position.entry_price)
                 self.positions[symbol].long_break_even_price = Decimal(position.breakeven_price)
-                logger.info(f'UPDATE Long PNL: {position.unrealized_pnl}')
+
+                logger.info(f'UPDATE Long PNL: {self.positions[symbol].long_pnl}')
                 logger.info(position)
 
+                save_position(
+                    position=self.positions[symbol],
+                    position_side=OrderPositionSide.LONG,
+                    symbol=symbol,
+                    webhook_id=webhook_id,
+                    status=status
+                )
+
+                if status == PositionStatus.CLOSED:
+                    self.positions[event.symbol] = SymbolPosition(
+                        long_qty=0,
+                        long_entry=0,
+                        long_break_even_price=0,
+                        long_adjusted_break_even_price=0,
+                    )
+
             elif position.position_side == 'SHORT':
-                if position.position_amount != self.positions[symbol].short_qty:
+
+                status = PositionStatus.OPEN
+
+                if position.position_amount != 0 and self.positions[symbol].short_qty == 0:
+                    # open
+                    logger.warning(f"Open position in {symbol} with {position.position_amount} amount")
+
+                elif position.position_amount == 0:
+                    # close
+                    logger.warning(f"Close position in {symbol} with {position.position_amount} amount")
+                    status = PositionStatus.CLOSED
+
+                    position_binance = get_exist_position(
+                        symbol=symbol,
+                        webhook_id=webhook_id,
+                        position_side=OrderPositionSide.SHORT,
+                        check_closed=False
+                    )
+                    if position_binance:
+                        last_orders: Order = db_get_order_binance_position_id(position_binance.id)
+                        order_binance = get_order_id(symbol, last_orders[0].binance_id)
+                        if order_binance:
+                            self.positions[symbol].short_pnl = self.positions[symbol].calculate_pnl_short(
+                                Decimal(order_binance.get('avgPrice')))
+
+                else:
                     logger.warning(
                         f"Changed position in {symbol} from {self.positions[symbol].short_qty} to {position.position_amount}")
-                self.positions[symbol].short_qty = Decimal(position.position_amount)
+
+                    status = PositionStatus.UPDATED
+
+                self.positions[symbol].short_qty = Decimal(abs(position.position_amount))
                 self.positions[symbol].short_entry = Decimal(position.entry_price)
                 self.positions[symbol].short_break_even_price = Decimal(position.breakeven_price)
-                logger.info(f'UPDATE Short PNL: {position.unrealized_pnl}')
+                logger.info(f'UPDATE Short PNL: {self.positions[symbol].short_pnl}')
                 logger.info(position)
+
+                save_position(
+                    position=self.positions[symbol],
+                    position_side=OrderPositionSide.SHORT,
+                    symbol=symbol,
+                    webhook_id=webhook_id,
+                    status=status
+                )
+
+                if status == PositionStatus.CLOSED:
+                    self.positions[event.symbol] = SymbolPosition(
+                        short_qty=0,
+                        short_entry=0,
+                        short_break_even_price=0,
+                        short_adjusted_break_even_price=0,
+                    )
 
 
 def calculate_pnl(position: SymbolPosition, current_price: Decimal):
@@ -188,7 +293,6 @@ import click
 @click.option("--symbol", prompt="Symbol", default="1000FLOKIUSDT", show_default=True,
               help="Enter the trading symbol (default: 1000FLOKIUSDT)")
 def main(symbol):
-
     # symbols = ['UNFIUSDT', '1000FLOKIUSDT', '1000LUNCUSDT', '1000SHIBUSDT', '1000XECUSDT', '1INCHUSDT']
     check_orders([symbol])
     trade_monitor = TradeMonitor([symbol])

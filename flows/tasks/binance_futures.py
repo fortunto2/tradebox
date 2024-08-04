@@ -246,6 +246,25 @@ def check_all_orders(symbol: str, orderId: int = None):
         return None
 
 
+
+@task
+def get_last_order_in_position(symbol: str):
+    """
+    Monitor all  orders.
+
+    :param symbol: The symbol of the order to monitor.
+    :return: The order status.
+    """
+    orders = client.get_all_orders(symbol=symbol, orderId=orderId)
+
+    if orders:
+        logging.info(f"Orders: {orders}")
+        return orders
+    else:
+        logging.info(f"No orders found")
+        return None
+
+
 @task
 def get_current_price(symbol: str) -> Decimal:
     try:

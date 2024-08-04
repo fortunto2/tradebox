@@ -8,6 +8,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from config import settings
 from core.clients.db_async import get_async_session, async_engine
 from core.clients.db_sync import SessionLocal, sync_engine
+from core.models.binance_position import BinancePosition
 from core.models.binance_symbol import BinanceSymbol
 # from core.clients.db_sync import sync_engine
 from flows.open_long_potition import open_long_position
@@ -49,11 +50,11 @@ class WebhooksAdmin(ModelView, model=WebHook):
     can_create = True
     can_edit = False
     can_delete = False
-    column_list = [WebHook.id, WebHook.symbol]
+    column_list = [WebHook.id, WebHook.symbol, WebHook.side, WebHook.positionSide, WebHook.open, WebHook.settings]
     # column_searchable_list = [WebHook.symbol]
     # column_sortable_list = [WebHook.id]
     # column_formatters = {WebHook.symbol: lambda m, a: m.symbol[:10]}
-    # column_default_sort = [(WebHook.id, True), (WebHook.symbol, False)]
+    column_default_sort = [(WebHook.id, True), (WebHook.symbol, False)]
 
 
 admin.add_view(WebhooksAdmin)
@@ -66,11 +67,34 @@ class BinanceSymbolAdmin(ModelView, model=BinanceSymbol):
 
 admin.add_view(BinanceSymbolAdmin)
 
+class BinancePositionAdmin(ModelView, model=BinancePosition):
+    can_create = False
+    can_edit = False
+    can_delete = False
+    column_list = [BinancePosition.id,
+                   BinancePosition.webhook_id,
+                   BinancePosition.symbol,
+                   BinancePosition.position_side,
+                   BinancePosition.position_qty,
+                   BinancePosition.entry_price,
+                   BinancePosition.entry_break_price,
+                   BinancePosition.pnl,
+                   BinancePosition.status,
+                   BinancePosition.created_at,
+                   BinancePosition.closed_at]
+
+    column_searchable_list = [BinancePosition.symbol]
+    # last is first
+    column_default_sort = [(BinancePosition.id, True), (BinancePosition.created_at, False)]
+
+
+admin.add_view(BinancePositionAdmin)
+
 class OrdersAdmin(ModelView, model=Order):
     can_create = False
     can_edit = False
     can_delete = False
-    column_list = [Order.id, Order.binance_id, Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status, Order.type, Order.price, Order.created_at]
+    column_list = [Order.id, Order.binance_id, Order.symbol, Order.webhook_id, Order.binance_position_id, Order.position_side, Order.side, Order.status, Order.type, Order.price, Order.created_at]
     column_searchable_list = [Order.symbol, Order.webhook_id, Order.binance_id]
     column_sortable_list = [Order.id, Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status,
                             Order.type, Order.created_at, Order.binance_id]

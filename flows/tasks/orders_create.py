@@ -5,9 +5,11 @@ from pprint import pprint
 
 from binance.error import ClientError
 from prefect import task
+from sqlalchemy.exc import IntegrityError
 
 from core.models.monitor import SymbolPosition
 from core.schemas.position import LongPosition, ShortPosition
+from core.views.handle_positions import get_exist_position
 from flows.tasks.binance_futures import create_order_binance, check_position, cancel_order_binance
 from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide, OrderStatus, OrderBinanceStatus
 from core.views.handle_orders import db_get_all_order
@@ -52,8 +54,17 @@ def create_long_market_order(
         market_order.binance_status = OrderBinanceStatus.FILLED
 
         pprint(market_order.model_dump())
-        session.add(market_order)
-        session.commit()
+        try:
+            session.add(market_order)
+            session.commit()
+        except IntegrityError as e:
+            print(e)
+            logging.warning(f"Error creating order: {e}")
+        #     select and update
+            select_order = session.query(Order).filter(Order.binance_id == market_order.binance_id).first()
+            select_order.status = OrderStatus.FILLED
+            session.commit()
+
         return market_order
 
     return execute_sqlmodel_query_single(create_order)
@@ -148,6 +159,14 @@ def create_long_tp_order(
 
         take_profit_order.binance_id = create_order_binance(take_profit_order)
         take_profit_order.status = OrderStatus.IN_PROGRESS
+
+        binance_position = get_exist_position(
+            symbol=symbol,
+            webhook_id=webhook_id,
+            position_side=OrderPositionSide.LONG
+        )
+        if binance_position:
+            take_profit_order.binance_position = binance_position
 
         pprint(take_profit_order.model_dump())
         session.add(take_profit_order)

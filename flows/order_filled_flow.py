@@ -5,15 +5,16 @@ from prefect.task_runners import ConcurrentTaskRunner
 
 from core.logger import logger
 from core.models.monitor import SymbolPosition
-from core.schemas.events.agg_trade import AggregatedTradeEvent
+from core.views.handle_positions import get_exist_position
 from flows.agg_trade_flow import close_positions
 from core.clients.db_sync import SessionLocal
-from core.models.orders import OrderStatus, Order, OrderType
+from core.models.orders import OrderStatus, Order, OrderType, OrderPositionSide
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.schemas.webhook import WebhookPayload
 from core.views.handle_orders import db_get_order_binance_id, get_webhook_last
 from flows.tasks.orders_create import create_short_market_stop_loss_order, create_long_tp_order
 from flows.tasks.orders_processing import open_short_position_loop, grid_make_long_limit_order, check_orders_in_the_grid
+from flows.order_new_flow import order_new_flow
 
 
 @task(
@@ -27,7 +28,7 @@ def handle_order_update(event):
 
 
 @flow(task_runner=ConcurrentTaskRunner())
-def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
+def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition, order_type: OrderType = None):
     with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
         with SessionLocal() as session:
 
@@ -37,7 +38,11 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
 
             order: Order = db_get_order_binance_id(order_binance_id)
             if not order:
-                logger.error(f"Order not found in DB - {order_binance_id}")
+                logger.warning(f"Order not found in DB - {order_binance_id}")
+                if order_type:
+                    order_new_flow(event, order_type)
+            elif order.status == OrderStatus.FILLED:
+                logger.warning(f"Order already filled - {order_binance_id}")
                 return None
 
             webhook = order.webhook
@@ -48,12 +53,25 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
             #     logger.error(f"!!!!!Webhook not found in DB - {event.symbol}")
             #     return None
 
+            if not order.binance_position_id:
+
+                binance_position = get_exist_position(
+                    event.symbol,
+                    webhook.id,
+                    OrderPositionSide(event.position_side),
+                    check_closed=False)
+                if not binance_position:
+                    logger.error(f"Position not found in DB - {event.symbol}")
+                    # return None
+                else:
+                    order.binance_position = binance_position
+
             order.binance_id = order_binance_id
             order.status = OrderStatus.FILLED
             order.binance_status = event.order_status
             order.price = event.average_price
 
-            session.add(order)
+            session.merge(order)
             session.commit()
 
             payload = WebhookPayload(
@@ -70,10 +88,12 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
                 close_positions(
                     position=position,
                     symbol=event.symbol,
-                    close_long=False, #closed by TP order
+                    close_long=False,  # closed by TP order
                     close_short=True
                 )
 
+            # elif event.order_type == "MARKET":
+            #     pass
             elif order.type == OrderType.LONG_LIMIT:
                 logger.info(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
                 tp_order = create_long_tp_order.submit(
@@ -94,7 +114,6 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
                 else:
                     logger.info(f"stop: filled_orders {len(grid)} <= grid_orders {len(filled_orders_in_db)}")
 
-
             elif order.type == OrderType.SHORT_MARKET_STOP_LOSS:
                 logger.info(f"Order {order_binance_id} SHORT_MARKET_STOP_LOSS start make_hedge_by_pnl")
                 open_short_position_loop(
@@ -114,4 +133,3 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
                 logger.info(f"Create short_stop_loss_order: {short_stop_loss_order.id}")
 
         session.commit()
-

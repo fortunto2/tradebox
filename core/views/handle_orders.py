@@ -84,6 +84,8 @@ def get_webhook_last(symbol: str) -> WebHook:
     return execute_sqlmodel_query_single(query_func)
 
 
+
+
 def get_all_symbols(status=None) -> list:
     def query_func(session):
         if status is None:
@@ -180,6 +182,22 @@ def db_get_order_binance_id(order_binance_id) -> Order:
     return execute_sqlmodel_query_single(query_func)
 
 
+def db_get_order_binance_position_id(binance_position_id) -> Order:
+    def query_func(session):
+        try:
+            query = select(Order
+                           ).options(joinedload(Order.webhook)
+                                     ).where(Order.binance_position_id == binance_position_id).order_by(Order.id.desc())
+            result = session.exec(query)
+            return result.all()
+        except Exception as e:
+            print(f"no order in db by binance_postition_id {binance_position_id}")
+            logging.error(f"Error: {e}")
+            return None
+
+    return execute_sqlmodel_query_single(query_func)
+
+
 def db_get_all_order(webhook_id, order_status: OrderStatus, order_type: OrderType) -> list:
     def query_func(session):
         query = select(Order).where(
@@ -208,19 +226,28 @@ def get_next_order(symbol: str) -> Order:
 
 
 def main():
-    order = db_get_order_binance_id(1594495326)
-    webhook = order.webhook
+    # order = db_get_order_binance_id(1594495326)
+    # webhook = order.webhook
+    #
+    # payload = WebhookPayload(
+    #     name=webhook.name,
+    #     side=order.side,
+    #     positionSide=order.position_side,
+    #     symbol=order.symbol,
+    #     open=webhook.open,
+    #     settings=webhook.settings
+    # )
+    #
+    # print(payload.model_dump())
 
-    payload = WebhookPayload(
-        name=webhook.name,
-        side=order.side,
-        positionSide=order.position_side,
-        symbol=order.symbol,
-        open=webhook.open,
-        settings=webhook.settings
+    order = db_get_last_order(
+        webhook_id='4',
+        order_type=OrderType.SHORT_MARKET_STOP_OPEN,
+        order_by='desc'
+
     )
 
-    print(payload.model_dump())
+    return order
 
 
 if __name__ == "__main__":

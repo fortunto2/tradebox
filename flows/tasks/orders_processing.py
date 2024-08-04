@@ -39,13 +39,14 @@ def open_short_position_loop(
     quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
 
     # только один раз, когда хватает денег
-    hedge_stop_order = create_short_market_stop_order.submit(
+    short_market_order = create_short_market_stop_order.submit(
         symbol=payload.symbol,
         price=hedge_price,
         quantity=quantity,
         leverage=payload.open.leverage,
         webhook_id=webhook_id,
     )
+
 
 
 
@@ -88,7 +89,11 @@ def get_grid_orders(
     return execute_sqlmodel_query(get_orders)
 
 
-@task
+@task(
+    retries=3,
+    retry_delay_seconds=1,
+
+)
 def check_orders_in_the_grid(payload: WebhookPayload, webhook_id):
     def check_orders(session):
         grid_orders = update_grid(payload, webhook_id)
@@ -123,6 +128,8 @@ def grid_make_long_limit_order(
         if not payload:
             print("payload not found, webhook_id:", webhook_id)
             return False
+
+        time.sleep(0.5)
 
         filled_orders, _, grid = check_orders_in_the_grid(payload, webhook_id)
 

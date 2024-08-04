@@ -6,6 +6,7 @@ from core.logger import logger
 from core.models.orders import OrderStatus, Order, OrderType, OrderPositionSide, OrderSide
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.views.handle_orders import db_get_order_binance_id, get_webhook_last, db_set_order_status
+from core.views.handle_positions import get_exist_position
 
 
 @flow(task_runner=ConcurrentTaskRunner())
@@ -16,6 +17,11 @@ def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
     logger.info(f"Order binance_id: {order_binance_id}")
 
     webhook = get_webhook_last(event.symbol)
+
+    binance_position = get_exist_position(event.symbol, webhook.id, OrderPositionSide(event.position_side), check_closed=False)
+    if not binance_position:
+        logger.error(f"Position not found in DB - {event.symbol}")
+        # return None
 
     order: Order = db_get_order_binance_id(order_binance_id)
     if order:
@@ -37,6 +43,8 @@ def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
             status=OrderStatus.IN_PROGRESS,
             binance_status=event.order_status,
             binance_id=order_binance_id,
+            binance_position=binance_position
+
         )
 
         session.add(order)
