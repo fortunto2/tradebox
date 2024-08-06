@@ -50,6 +50,7 @@ def open_short_position_loop(
 
 
 
+
 def get_grid_orders(
         symbol: str,
         status: OrderStatus = OrderStatus.FILLED,

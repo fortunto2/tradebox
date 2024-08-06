@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from core.models.monitor import SymbolPosition
 from core.schemas.position import LongPosition, ShortPosition
 from core.views.handle_positions import get_exist_position
-from flows.tasks.binance_futures import create_order_binance, check_position, cancel_order_binance
+from flows.tasks.binance_futures import create_order_binance, check_position, cancel_order_binance, get_order_id
 from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide, OrderStatus, OrderBinanceStatus
 from core.views.handle_orders import db_get_all_order
 from core.clients.db_sync import execute_sqlmodel_query_single
@@ -54,15 +54,16 @@ def create_long_market_order(
         market_order.binance_status = OrderBinanceStatus.FILLED
 
         pprint(market_order.model_dump())
-        try:
+
+        select_order: Order = session.query(Order).filter(Order.binance_id == market_order.binance_id).first()
+        if not select_order:
             session.add(market_order)
             session.commit()
-        except IntegrityError as e:
-            print(e)
-            logging.warning(f"Error creating order: {e}")
-        #     select and update
-            select_order = session.query(Order).filter(Order.binance_id == market_order.binance_id).first()
+        else:
+            logging.warning(f"Order already exists: {market_order.binance_id}")
             select_order.status = OrderStatus.FILLED
+            select_order.price = market_order.price
+            select_order.binance_status = OrderBinanceStatus.FILLED
             session.commit()
 
         return market_order
@@ -105,8 +106,17 @@ def create_short_market_order(
             market_order.status = OrderStatus.FILLED
 
         market_order.binance_status = OrderBinanceStatus.FILLED
-        session.add(market_order)
-        session.commit()
+        select_order: Order = session.query(Order).filter(Order.binance_id == market_order.binance_id).first()
+        if not select_order:
+            session.add(market_order)
+            session.commit()
+        else:
+            logging.warning(f"Order already exists: {market_order.binance_id}")
+            select_order.status = OrderStatus.FILLED
+            select_order.price = market_order.price
+            select_order.binance_status = OrderBinanceStatus.FILLED
+            session.commit()
+
         return market_order
 
 
@@ -169,8 +179,17 @@ def create_long_tp_order(
             take_profit_order.binance_position = binance_position
 
         pprint(take_profit_order.model_dump())
-        session.add(take_profit_order)
-        session.commit()
+        select_order: Order = session.query(Order).filter(Order.binance_id == take_profit_order.binance_id).first()
+        if not select_order:
+            session.add(take_profit_order)
+            session.commit()
+        else:
+            logging.warning(f"Order already exists: {take_profit_order.binance_id}")
+            select_order.status = OrderStatus.IN_PROGRESS
+            select_order.type = OrderType.LONG_TAKE_PROFIT
+            select_order.price = take_profit_order.price
+            select_order.binance_status = OrderBinanceStatus.FILLED
+            session.commit()
         return take_profit_order
 
     return execute_sqlmodel_query_single(create_order)
@@ -202,8 +221,17 @@ def create_long_limit_order(
 
         pprint(limit_order.model_dump())
 
-        session.add(limit_order)
-        session.commit()
+        select_order: Order = session.query(Order).filter(Order.binance_id == limit_order.binance_id).first()
+        if not select_order:
+            session.add(limit_order)
+            session.commit()
+        else:
+            logging.warning(f"Order already exists: {limit_order.binance_id}")
+            select_order.status = OrderStatus.IN_PROGRESS
+            select_order.price = limit_order.price
+            select_order.binance_status = OrderBinanceStatus.FILLED
+            session.commit()
+
         return limit_order
 
     return execute_sqlmodel_query_single(create_order)
@@ -233,6 +261,11 @@ def create_short_market_stop_order(
         )
 
         order.binance_id = create_order_binance(order)
+
+        if not order.binance_id:
+            order.type = OrderType.SHORT_MARKET
+            order.binance_id = create_order_binance(order)
+
         order.status = OrderStatus.IN_PROGRESS
 
         pprint(order.model_dump())
@@ -273,10 +306,12 @@ def create_short_market_stop_loss_order(
             webhook_id=webhook_id,
         )
 
-        try:
+        order.binance_id = create_order_binance(order)
+
+        if not order.binance_id:
+            order.type = OrderType.SHORT_MARKET
             order.binance_id = create_order_binance(order)
-        except Exception as e:
-            print(e)
+
         order.status = OrderStatus.IN_PROGRESS
         pprint(order.model_dump())
 

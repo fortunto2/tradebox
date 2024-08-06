@@ -1,7 +1,7 @@
 {
   "name": "APIKEY",
   "side": "buy",
-  "positionSide": "long",
+  "positionSide": "flat",
   "symbol": "1000FLOKIUSDT",
   "open": {
     "enabled": true,
@@ -10,9 +10,8 @@
     "leverage": "25"
   },
   "settings": {
-    "start": 1,
     "deposit": 5.0,
-    "extramarg": 2.5,
+    "extramarg": 5.0,
     "tp": "1.06",
     "trail_1": 1.1,
     "trail_2": 0.0,

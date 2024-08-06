@@ -4,6 +4,7 @@ from functools import lru_cache, cache
 from time import sleep
 from typing import List
 
+from binance.error import ClientError
 from binance.um_futures import UMFutures
 import sys
 import logging
@@ -145,15 +146,21 @@ def create_order_binance(order: Order, return_full_response=False):
             order_params["timeInForce"] = "GTC"
             order_params["type"] = 'LIMIT'
 
-        response = client.new_order(**order_params)
+        try:
+            response = client.new_order(**order_params)
 
-        logging.info(f"Order created successfully: {response}")
-        if return_full_response:
-            return response
-        return str(response['orderId'])
-        # except Exception as e:
-        #     logging.error(f"Failed to create order: {e}")
-        #     raise HTTPException(status_code=500, detail="Failed to create order")
+            logging.info(f"Order created successfully: {response}")
+            if return_full_response:
+                return response
+            return str(response['orderId'])
+
+        except ClientError as e:
+            if e.error_code == -2021:
+                logging.error(f"Market stop order - не может быть выставлен выше цены : {e.error_message}")
+                return None
+
+            logging.error(f"Failed to create order: {e}")
+            raise Exception(f"Failed to create order: {e}")
 
 
 @task
@@ -255,7 +262,7 @@ def get_last_order_in_position(symbol: str):
     :param symbol: The symbol of the order to monitor.
     :return: The order status.
     """
-    orders = client.get_all_orders(symbol=symbol, orderId=orderId)
+    orders = client.get_all_orders(symbol=symbol)
 
     if orders:
         logging.info(f"Orders: {orders}")

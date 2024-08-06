@@ -1,9 +1,8 @@
 from typing import List, Dict
 
-from pydantic import BaseModel, Field
 
-from core.models.binance_position import PositionStatus, BinancePosition
-from core.models.monitor import TradeMonitorBase, SymbolPosition
+from core.models.binance_position import PositionStatus
+from core.models.monitor import  SymbolPosition
 from core.models.orders import OrderType, OrderPositionSide, Order
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdate
@@ -98,8 +97,8 @@ class TradeMonitor:
                 our_order_type = OrderType.SHORT_MARKET
             elif event.order_type == 'MARKET' and event.position_side == 'LONG':
                 our_order_type = OrderType.LONG_MARKET
-            # elif event.order_type == 'LIMIT' and event.position_side == 'LONG':
-            #     our_order_type = OrderType.LONG_TAKE_PROFIT
+            elif event.order_type == 'LIMIT' and event.position_side == 'LONG' and event.side == 'SELL':
+                our_order_type = OrderType.LONG_TAKE_PROFIT
             elif event.order_type == 'LIMIT' and event.position_side == 'LONG':
                 our_order_type = OrderType.LONG_LIMIT
             elif event.order_type == 'LIMIT' and event.position_side == 'SHORT':
