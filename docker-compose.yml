@@ -54,6 +54,13 @@ services:
     healthcheck:
       test: [] # Properly defining an empty healthcheck mapping
 
+  ws-monitor6:
+    <<: *backend
+    ports: []
+    command: python ws_monitor.py --symbol=1000PEPEUSDT
+    healthcheck:
+      test: [] # Properly defining an empty healthcheck mapping
+
 
   prefect-server: &prefect
     image: prefecthq/prefect:2.19.8-python3.11
