@@ -155,12 +155,10 @@ def create_order_binance(order: Order, return_full_response=False):
             return str(response['orderId'])
 
         except ClientError as e:
-            if e.error_code == -2021:
-                logging.error(f"Market stop order - не может быть выставлен выше цены : {e.error_message}")
-                return None
+            # if e.error_code == -2021:
+            logging.error(f"Market stop order - не может быть выставлен выше цены : {e.error_message}")
+            return None
 
-            logging.error(f"Failed to create order: {e}")
-            raise Exception(f"Failed to create order: {e}")
 
 
 @task
