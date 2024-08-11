@@ -109,10 +109,11 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
     name=f'create_order_binance',
     task_run_name='create_order_{order.side.value}_{order.type.value}'
 )
-def create_order_binance(order: Order, return_full_response=False):
+def create_order_binance(order: Order, return_full_response=False, trail_follow_price=None):
     """
     https://binance-docs.github.io/apidocs/futures/en/#new-order-trade
 
+    :param trail_follow_price: just for LONG_TRAILING_STOP_MARKET
     :param return_full_response:
     :param order:
     :return:
@@ -141,6 +142,13 @@ def create_order_binance(order: Order, return_full_response=False):
         elif order.type in [OrderType.SHORT_MARKET_STOP_LOSS, OrderType.SHORT_MARKET_STOP_OPEN]:
             order_params["stopPrice"] = price
             order_params["type"] = 'STOP_MARKET'
+        elif order.type == OrderType.LONG_TRAILING_STOP_MARKET:
+            if order_params["callbackRate"] < 0.1:
+                logging.error("callbackRate must be greater than 0.1")
+                order_params["callbackRate"] = 0.1
+            order_params["callbackRate"] = trail_follow_price
+            order_params["type"] = 'TRAILING_STOP_MARKET'
+            order_params["activationPrice"] = price
         else:
             order_params["price"] = price
             order_params["timeInForce"] = "GTC"
@@ -156,7 +164,7 @@ def create_order_binance(order: Order, return_full_response=False):
 
         except ClientError as e:
             # if e.error_code == -2021:
-            logging.error(f"Market stop order - не может быть выставлен выше цены : {e.error_message}")
+            logging.error(e.error_message)
             return None
 
 

@@ -119,8 +119,19 @@ def create_short_market_order(
 
         return market_order
 
-
     return execute_sqlmodel_query_single(create_order)
+
+
+def cancel_in_progress_orders(symbol, webhook_id, order_type: OrderType):
+    orders = db_get_all_order(webhook_id, OrderStatus.IN_PROGRESS, order_type)
+    for order in orders:
+        try:
+            result = cancel_order_binance(symbol, order.binance_id)
+            if result['status'] == 'CANCELED':
+                order.status = OrderStatus.CANCELED
+        except Exception as e:
+            print(e)
+            logging.error(f"Error canceling order: {e}")
 
 
 @task
@@ -134,15 +145,7 @@ def create_long_tp_order(
     print("Take profit order:")
 
     def create_order(session):
-        orders = db_get_all_order(webhook_id, OrderStatus.IN_PROGRESS, OrderType.LONG_TAKE_PROFIT)
-        for order in orders:
-            try:
-                result = cancel_order_binance(symbol, order.binance_id)
-                if result['status'] == 'CANCELED':
-                    order.status = OrderStatus.CANCELED
-            except Exception as e:
-                print(e)
-                logging.error(f"Error canceling order: {e}")
+        cancel_in_progress_orders(symbol, webhook_id, OrderType.LONG_TAKE_PROFIT)
 
         if not position:
             position_long, _ = check_position(symbol=symbol)
@@ -151,7 +154,7 @@ def create_long_tp_order(
             long_entry = position_long.entryPrice
             long_qty = position_long.positionAmt
         else:
-            long_entry = position.long_entry
+            long_entry = position.position.long_adjusted_break_even_price
             long_qty = position.long_qty
 
         tp_price = Decimal(long_entry) * (1 + Decimal(tp) / 100)
@@ -289,7 +292,6 @@ def create_short_market_stop_loss_order(
     print("SHORT-BUY:")
 
     def create_order(session):
-
         price_position = Decimal(position.short_entry) * (1 + Decimal(sl_short) / 100)
         quantity = abs(position.short_qty)
         print('price:', price_position)
@@ -318,5 +320,72 @@ def create_short_market_stop_loss_order(
         # session.add(order)
         # session.commit()
         return order
+
+    return execute_sqlmodel_query_single(create_order)
+
+
+@task
+def create_long_trailing_stop_order(
+        symbol: str,
+        leverage: int,
+        webhook_id,
+        position: SymbolPosition
+) -> Order:
+    print("Creating LONG TRAILING STOP order with custom parameters:")
+
+    def create_order(session):
+        cancel_in_progress_orders(symbol, webhook_id, OrderType.LONG_TAKE_PROFIT)
+        cancel_in_progress_orders(symbol, webhook_id, OrderType.LONG_TRAILING_STOP_MARKET)
+
+        # Рассчитываем цену активации трейлинга с использованием long_adjusted_break_even_price
+        activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
+        trail_follow_price = Decimal(position.trailing_2 / 100)
+
+        # Настройка параметров трейлинг-стоп ордера
+        trailing_stop_order = Order(
+            position_side=OrderPositionSide.LONG,
+            side=OrderSide.SELL,
+            type=OrderType.LONG_TRAILING_STOP_MARKET,  # Используем обновленный тип ордера
+            symbol=symbol,
+            quantity=position.long_qty,
+            leverage=leverage,
+            webhook_id=webhook_id,
+            price=activation_price,  # Цена активации трейлинга
+            # trail_amount=trail_follow_price,  # Процент следования за ценой #callbackRate
+            # trail_step=trail_step  # Шаг перемещения ордера
+        )
+
+        # Создание ордера на Binance
+        trailing_stop_order.binance_id = create_order_binance(order=trailing_stop_order,
+                                                              trail_follow_price=trail_follow_price)
+        trailing_stop_order.status = OrderStatus.IN_PROGRESS
+
+        # Привязка ордера к существующей позиции
+        binance_position = get_exist_position(
+            symbol=symbol,
+            webhook_id=webhook_id,
+            position_side=OrderPositionSide.LONG
+        )
+        if binance_position:
+            trailing_stop_order.binance_position = binance_position
+
+        pprint(trailing_stop_order.model_dump())
+
+        # Сохранение ордера в базе данных
+        select_order: Order = session.query(Order).filter(Order.binance_id == trailing_stop_order.binance_id).first()
+        if not select_order:
+            session.add(trailing_stop_order)
+            session.commit()
+        else:
+            logging.warning(f"Order already exists: {trailing_stop_order.binance_id}")
+            select_order.status = OrderStatus.IN_PROGRESS
+            select_order.type = OrderType.LONG_TRAILING_STOP_MARKET  # Обновленный тип ордера
+            select_order.price = activation_price
+            # select_order.trail_amount = trail_follow_price
+            # select_order.trail_step = trail_step
+            select_order.binance_status = OrderBinanceStatus.FILLED
+            session.commit()
+
+        return trailing_stop_order
 
     return execute_sqlmodel_query_single(create_order)

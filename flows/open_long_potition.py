@@ -3,10 +3,8 @@ from prefect.task_runners import ConcurrentTaskRunner
 
 from core.grid import calculate_grid_orders
 from core.logger import logger
-from core.models.monitor import SymbolPosition
 from core.schemas.position import LongPosition
 from core.schemas.webhook import WebhookPayload
-from core.views.handle_positions import save_position
 
 from flows.tasks.orders_create import create_long_market_order, create_long_tp_order
 from flows.tasks.orders_processing import grid_make_long_limit_order

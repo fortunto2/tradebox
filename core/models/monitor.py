@@ -19,6 +19,9 @@ class SymbolPosition(BaseModel):
     long_pnl: Decimal = Field(default_factory=lambda: Decimal(0))
     short_pnl: Decimal = Field(default_factory=lambda: Decimal(0))
 
+    trailing_1: Decimal = Field(default_factory=lambda: Decimal(0))
+    trailing_2: Decimal = Field(default_factory=lambda: Decimal(0))
+
     price_precision: int = 6
 
     def calculate_long_adjusted_break_even_price(self):

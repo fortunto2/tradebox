@@ -1,5 +1,6 @@
 from typing import List, Dict
 
+import sentry_sdk
 
 from core.models.binance_position import PositionStatus
 from core.models.monitor import  SymbolPosition
@@ -20,17 +21,16 @@ from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClie
 from flows.agg_trade_flow import close_positions
 from flows.order_filled_flow import order_filled_flow
 from flows.order_cancel_flow import order_cancel_flow
+from flows.tasks.orders_create import create_long_trailing_stop_order
 
 settings = get_settings()
 
-# # Sentry Initialization
-# sentry_sdk.init(
-#     dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
-#     traces_sample_rate=1.0,
-#     profiles_sample_rate=1.0,
-# )
 
-settings = get_settings()
+sentry_sdk.init(
+    dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
 
 
 class TradeMonitor:
@@ -70,12 +70,42 @@ class TradeMonitor:
         if event_type == 'aggTrade':
             event = AggregatedTradeEvent.parse_obj(message_dict)
             position: SymbolPosition = self.positions[event.symbol]
+            current_price = Decimal(event.price)
 
-            pnl_diff = calculate_pnl(position, Decimal(event.price))
+            if position.long_qty == 0:
+                # logger.warning(f"=No position in {event.symbol}")
+                return None
+
+            pnl_diff = calculate_pnl(position, current_price)
 
             if pnl_diff > 0 and position.short_qty:
                 logger.warning(f"=Profit: {pnl_diff} USDT")
                 close_positions(position, event.symbol)
+
+            # todo: сделать через базу
+            webhook = get_webhook_last(event.symbol)
+
+            if position.trailing_1 == 0 and position.trailing_2 == 0:
+                position.trailing_1 = Decimal(webhook.settings.get('trail_1', 0))
+                position.trailing_2 = Decimal(webhook.settings.get('trail_2', 0))
+
+            activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
+            print(f"Total current_price: {current_price}")
+            print(f"Total activation_price: {activation_price}")
+
+            # Активация происходит 1 раз? за весь цикл работы с вебхуком да 1 раз
+            if current_price >= activation_price:
+                logger.info(
+                    f"Price reached trailing activation level ({position.trailing_1}%). Canceling TP and creating trailing stop order.")
+                # ждем 1 секунду, выше или равно и только после этого
+                #1 когда есть ТП -  убираем тейкпрофит и ставит трейлинг ()
+                create_long_trailing_stop_order(
+                    symbol=event.symbol,
+                    leverage=webhook.open.get('leverage'),
+                    webhook_id=webhook.id,
+                    position=position
+                )
+
 
         elif event_type == 'ORDER_TRADE_UPDATE':
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
