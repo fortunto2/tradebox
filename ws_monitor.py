@@ -99,8 +99,8 @@ class TradeMonitor:
 
             # Активация происходит 1 раз? за весь цикл работы с вебхуком да 1 раз
             if current_price >= activation_price:
-                logger.info(
-                    f"{event.symbol} Price reached trailing activation level ({position.trailing_1}%). Canceling TP and creating trailing stop order.")
+                # logger.info(
+                #     f"{event.symbol} Price reached trailing activation level ({position.trailing_1}%). Canceling TP and creating trailing stop order.")
 
                 # get_exist_position todo: добавить в базу пометку что активирован трейлинг
 
@@ -109,11 +109,12 @@ class TradeMonitor:
                     # должна всегда увеличивать только
                     position.trailing_price = new_trailing_price
 
-                logger.info(f"{event.symbol} New trailing stop price set at: {position.trailing_price}")
+                # logger.info(f"{event.symbol} New trailing stop price set at: {position.trailing_price}")
 
                 # Проверка, увеличилась ли рыночная цена на trail_step
                 if current_price >= position.trailing_price + (position.trailing_price * Decimal(position.webhook.settings.get('trail_step')) / 100):
                     position.trailing_price = current_price - (current_price * position.trailing_2 / 100)
+                    logger.warning(f"{event.symbol} Current price: {current_price}")
                     logger.warning(f"{event.symbol} Trailing stop updated to: {position.trailing_price}")
 
                 # Проверка на достижение стоп-лосса
