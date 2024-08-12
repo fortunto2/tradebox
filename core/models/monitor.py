@@ -1,18 +1,19 @@
 import logging
 from decimal import Decimal
 from typing import List, Dict
-
 from pydantic import BaseModel, Field
+
+from core.models.webhook import WebHook
 
 
 class SymbolPosition(BaseModel):
     long_qty: Decimal = Field(default_factory=lambda: Decimal(0))
-    long_entry: Decimal = Field(default_factory=lambda: Decimal(0)) # position_price
+    long_entry: Decimal = Field(default_factory=lambda: Decimal(0))  # position_price
     long_break_even_price: Decimal = Field(default_factory=lambda: Decimal(0))
     long_adjusted_break_even_price: Decimal = Field(default_factory=lambda: Decimal(0))
 
     short_qty: Decimal = Field(default_factory=lambda: Decimal(0))
-    short_entry: Decimal = Field(default_factory=lambda: Decimal(0)) # position_price
+    short_entry: Decimal = Field(default_factory=lambda: Decimal(0))  # position_price
     short_break_even_price: Decimal = Field(default_factory=lambda: Decimal(0))
     short_adjusted_break_even_price: Decimal = Field(default_factory=lambda: Decimal(0))
 
@@ -21,8 +22,11 @@ class SymbolPosition(BaseModel):
 
     trailing_1: Decimal = Field(default_factory=lambda: Decimal(0))
     trailing_2: Decimal = Field(default_factory=lambda: Decimal(0))
+    trailing_price: Decimal = Field(default_factory=lambda: Decimal(0))
 
     price_precision: int = 6
+
+    webhook: WebHook = None
 
     def calculate_long_adjusted_break_even_price(self):
         if self.long_break_even_price is not None and self.long_entry is not None:
@@ -89,6 +93,9 @@ class TradeMonitorBase:
     def __init__(self, symbols: List[str]):
         self.symbols = symbols
         self.positions: Dict[str, SymbolPosition] = {symbol: SymbolPosition() for symbol in symbols}
+        self.long_adjusted_break_even_price = None
+        self.trailing_2 = None
+        self.trailing_1 = None
 
     def on_message(self, message):
         pass
@@ -114,4 +121,3 @@ if __name__ == '__main__':
 
     total_pnl = symbol_position.long_pnl + symbol_position.short_pnl
     print(f"Total PnL: {total_pnl}")
-

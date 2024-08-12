@@ -154,7 +154,7 @@ def create_long_tp_order(
             long_entry = position_long.entryPrice
             long_qty = position_long.positionAmt
         else:
-            long_entry = position.position.long_adjusted_break_even_price
+            long_entry = position.long_adjusted_break_even_price
             long_qty = position.long_qty
 
         tp_price = Decimal(long_entry) * (1 + Decimal(tp) / 100)

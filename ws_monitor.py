@@ -76,35 +76,50 @@ class TradeMonitor:
                 # logger.warning(f"=No position in {event.symbol}")
                 return None
 
+            # ---- PNL CHECK --------
+
             pnl_diff = calculate_pnl(position, current_price)
 
             if pnl_diff > 0 and position.short_qty:
-                logger.warning(f"=Profit: {pnl_diff} USDT")
+                logger.warning(f"={event.symbol} Profit: {pnl_diff} USDT")
                 close_positions(position, event.symbol)
 
-            # todo: сделать через базу
-            webhook = get_webhook_last(event.symbol)
+            # ---- TRAILING --------
+
+            if not position.webhook:
+                position.webhook = get_webhook_last(event.symbol)
 
             if position.trailing_1 == 0 and position.trailing_2 == 0:
-                position.trailing_1 = Decimal(webhook.settings.get('trail_1', 0))
-                position.trailing_2 = Decimal(webhook.settings.get('trail_2', 0))
+                position.trailing_1 = Decimal(position.webhook.settings.get('trail_1', 0))
+                position.trailing_2 = Decimal(position.webhook.settings.get('trail_2', 0))
 
             activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
-            print(f"Total current_price: {current_price}")
-            print(f"Total activation_price: {activation_price}")
+            # logger.info(f"{event.symbol} Total current_price: {current_price}")
+            # logger.info(f"{event.symbol} Total activation_price: {activation_price}")
 
             # Активация происходит 1 раз? за весь цикл работы с вебхуком да 1 раз
             if current_price >= activation_price:
                 logger.info(
-                    f"Price reached trailing activation level ({position.trailing_1}%). Canceling TP and creating trailing stop order.")
-                # ждем 1 секунду, выше или равно и только после этого
-                #1 когда есть ТП -  убираем тейкпрофит и ставит трейлинг ()
-                create_long_trailing_stop_order(
-                    symbol=event.symbol,
-                    leverage=webhook.open.get('leverage'),
-                    webhook_id=webhook.id,
-                    position=position
-                )
+                    f"{event.symbol} Price reached trailing activation level ({position.trailing_1}%). Canceling TP and creating trailing stop order.")
+
+                # get_exist_position todo: добавить в базу пометку что активирован трейлинг
+
+                new_trailing_price = activation_price * (1 - position.trailing_2 / 100)
+                if position.trailing_price < new_trailing_price:
+                    # должна всегда увеличивать только
+                    position.trailing_price = new_trailing_price
+
+                logger.info(f"{event.symbol} New trailing stop price set at: {position.trailing_price}")
+
+                # Проверка, увеличилась ли рыночная цена на trail_step
+                if current_price >= position.trailing_price + (position.trailing_price * Decimal(position.webhook.settings.get('trail_step')) / 100):
+                    position.trailing_price = current_price - (current_price * position.trailing_2 / 100)
+                    logger.warning(f"{event.symbol} Trailing stop updated to: {position.trailing_price}")
+
+                # Проверка на достижение стоп-лосса
+                if current_price <= position.trailing_price:
+                    logger.warning(f"{event.symbol} Trailing stop triggered at: {current_price}")
+                    close_positions(position, event.symbol)
 
 
         elif event_type == 'ORDER_TRADE_UPDATE':
