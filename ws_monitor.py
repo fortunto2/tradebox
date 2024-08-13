@@ -73,16 +73,16 @@ class TradeMonitor:
             current_price = Decimal(event.price)
 
             if position.long_qty == 0:
-                # logger.warning(f"=No position in {event.symbol}")
                 return None
 
             # ---- PNL CHECK --------
-
             pnl_diff = calculate_pnl(position, current_price)
 
             if pnl_diff > 0 and position.short_qty:
                 logger.warning(f"={event.symbol} Profit: {pnl_diff} USDT")
                 close_positions(position, event.symbol)
+                position = SymbolPosition()
+                return None
 
             # ---- TRAILING --------
 
@@ -94,34 +94,32 @@ class TradeMonitor:
                 position.trailing_2 = Decimal(position.webhook.settings.get('trail_2', 0))
 
             activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
-            # logger.info(f"{event.symbol} Total current_price: {current_price}")
-            # logger.info(f"{event.symbol} Total activation_price: {activation_price}")
+            logger.warning(f"{event.symbol} Trailing activation_price: {round(activation_price, 8)}")
 
-            # Активация происходит 1 раз? за весь цикл работы с вебхуком да 1 раз
-            if current_price >= activation_price:
-                # logger.info(
-                #     f"{event.symbol} Price reached trailing activation level ({position.trailing_1}%). Canceling TP and creating trailing stop order.")
-
-                # get_exist_position todo: добавить в базу пометку что активирован трейлинг
-
+            # Активация трейлинга происходит один раз
+            if current_price >= activation_price and position.trailing_price is None:
+                # Если трейлинг еще не активирован, активируем его
                 new_trailing_price = activation_price * (1 - position.trailing_2 / 100)
-                if position.trailing_price < new_trailing_price:
-                    # должна всегда увеличивать только
-                    position.trailing_price = new_trailing_price
+                position.trailing_price = new_trailing_price
+                logger.warning(f"{event.symbol} Trailing stop activated at: {round(position.trailing_price, 8)}")
 
-                # logger.info(f"{event.symbol} New trailing stop price set at: {position.trailing_price}")
-
-                # Проверка, увеличилась ли рыночная цена на trail_step
-                if current_price >= position.trailing_price + (position.trailing_price * Decimal(position.webhook.settings.get('trail_step')) / 100):
-                    position.trailing_price = current_price - (current_price * position.trailing_2 / 100)
-                    logger.warning(f"{event.symbol} Current price: {current_price}")
-                    logger.warning(f"{event.symbol} Trailing stop updated to: {position.trailing_price}")
+            # Если цена trailing_price инициализирована
+            elif current_price >= activation_price and position.trailing_price is not None:
+                # Продолжаем обновлять trailing_price
+                if current_price >= position.trailing_price + (
+                        position.trailing_price * Decimal(position.webhook.settings.get('trail_step')) / 100):
+                    new_trailing_price = current_price - (current_price * position.trailing_2 / 100)
+                    if new_trailing_price > position.trailing_price:
+                        position.trailing_price = new_trailing_price
+                        logger.warning(f"{event.symbol} Current price: {round(current_price, 8)}")
+                        logger.warning(
+                        f"{event.symbol} Trailing stop updated to: {round(position.trailing_price, 8)}")
 
                 # Проверка на достижение стоп-лосса
                 if current_price <= position.trailing_price:
-                    logger.warning(f"{event.symbol} Trailing stop triggered at: {current_price}")
+                    logger.warning(f"{event.symbol} Trailing stop triggered at: {round(current_price, 8)}")
                     close_positions(position, event.symbol)
-
+                    position = SymbolPosition()
 
         elif event_type == 'ORDER_TRADE_UPDATE':
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
@@ -242,7 +240,7 @@ class TradeMonitor:
                 )
 
                 if status == PositionStatus.CLOSED:
-                    self.positions[event.symbol] = SymbolPosition(
+                    self.positions[symbol] = SymbolPosition(
                         long_qty=0,
                         long_entry=0,
                         long_break_even_price=0,
@@ -296,7 +294,7 @@ class TradeMonitor:
                 )
 
                 if status == PositionStatus.CLOSED:
-                    self.positions[event.symbol] = SymbolPosition(
+                    self.positions[symbol] = SymbolPosition(
                         short_qty=0,
                         short_entry=0,
                         short_break_even_price=0,
