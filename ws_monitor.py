@@ -88,6 +88,8 @@ class TradeMonitor:
 
             if not position.webhook:
                 position.webhook = get_webhook_last(event.symbol)
+                if not position.webhook:
+                    return None
 
             if position.trailing_1 == 0 and position.trailing_2 == 0:
                 position.trailing_1 = Decimal(position.webhook.settings.get('trail_1', 0))
