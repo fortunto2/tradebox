@@ -26,7 +26,7 @@ def handle_order_update(event):
 
 
 @flow(task_runner=ConcurrentTaskRunner())
-def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition, order_type: OrderType = None):
+async def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition, order_type: OrderType = None):
     with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
         with SessionLocal() as session:
 

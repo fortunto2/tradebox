@@ -7,13 +7,12 @@ from core.views.handle_positions import save_position
 from flows.tasks.binance_futures import cancel_open_orders
 from core.models.monitor import TradeMonitorBase, SymbolPosition
 from core.models.orders import OrderSide, OrderPositionSide
-from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.views.handle_orders import get_webhook_last
 from flows.tasks.orders_create import create_short_market_order, create_long_market_order
 
 
 @flow(task_runner=ConcurrentTaskRunner())
-def close_positions(position: SymbolPosition, symbol: str, close_short=True, close_long=True):
+async def close_positions(position: SymbolPosition, symbol: str, close_short=True, close_long=True):
 
     with tags(symbol):
         logger = get_run_logger()

@@ -10,7 +10,7 @@ from core.views.handle_positions import get_exist_position
 
 
 @flow(task_runner=ConcurrentTaskRunner())
-def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
+async def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
 
     logger.info(f"Order status: {event.order_status}")
     order_binance_id = str(event.order_id)
