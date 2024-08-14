@@ -103,17 +103,20 @@ def save_position(
         return position
 
 
-def get_exist_position(symbol: str, webhook_id: int, position_side: OrderPositionSide, check_closed=True):
+def get_exist_position(symbol: str, webhook_id: int = None, position_side: OrderPositionSide = None, check_closed=True) -> BinancePosition:
     """
     Load all orders with status IN_PROGRESS from the database.
     """
 
     def query_func(session):
         query = select(BinancePosition).where(
-            BinancePosition.symbol == symbol,
-            BinancePosition.webhook_id == webhook_id,
-            BinancePosition.position_side == position_side,
-        )
+            BinancePosition.symbol == symbol
+        ).order_by(BinancePosition.id.desc())
+
+        if position_side:
+            query = query.where(BinancePosition.position_side == position_side)
+        if webhook_id:
+            query = query.where(BinancePosition.webhook_id == webhook_id)
         if check_closed:
             query = query.where(BinancePosition.status != PositionStatus.CLOSED)
 

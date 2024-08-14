@@ -2,7 +2,7 @@ from typing import List, Dict
 
 import sentry_sdk
 
-from core.models.binance_position import PositionStatus
+from core.models.binance_position import PositionStatus, BinancePosition
 from core.models.monitor import  SymbolPosition
 from core.models.orders import OrderType, OrderPositionSide, Order
 from core.schemas.events.agg_trade import AggregatedTradeEvent
@@ -13,7 +13,7 @@ from decimal import Decimal
 from config import get_settings
 from core.schemas.position import LongPosition, ShortPosition
 from core.views.handle_orders import get_webhook_last, db_get_order_binance_position_id
-from core.views.handle_positions import get_exist_position
+from core.views.handle_positions import get_exist_position, save_position
 from flows.order_new_flow import order_new_flow
 from flows.tasks.binance_futures import client, check_position, get_order_id
 from core.logger import logger
@@ -21,7 +21,6 @@ from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClie
 from flows.agg_trade_flow import close_positions
 from flows.order_filled_flow import order_filled_flow
 from flows.order_cancel_flow import order_cancel_flow
-from flows.tasks.orders_create import create_long_trailing_stop_order
 
 settings = get_settings()
 
@@ -44,6 +43,9 @@ class TradeMonitor:
     def start_monitor_events(self):
         listen_key = client.new_listen_key().get('listenKey')
         for symbol in self.symbols:
+
+            self.positions[symbol].webhook = get_webhook_last(symbol)
+
             position_long, position_short = check_position(symbol)
             position_long: LongPosition
             position_short: ShortPosition
@@ -51,6 +53,7 @@ class TradeMonitor:
                 self.positions[symbol].long_qty = position_long.positionAmt
                 self.positions[symbol].long_entry = position_long.entryPrice
                 self.positions[symbol].long_break_even_price = position_long.breakEvenPrice
+
                 logger.warning(
                     f"{symbol} +LONG -> qty: {self.positions[symbol].long_qty}, Entry price: {self.positions[symbol].long_entry}")
             if position_short:
@@ -59,7 +62,10 @@ class TradeMonitor:
                 self.positions[symbol].short_break_even_price = position_short.breakEvenPrice
                 logger.warning(
                     f"{symbol} -SHORT -> qty: {self.positions[symbol].short_qty}, Entry price: {self.positions[symbol].short_entry}")
+
             self.client.agg_trade(symbol)
+            self.check_closed_positions_status(symbol)
+
         self.client.user_data(listen_key=listen_key)
 
     def on_message(self, ws, msg):
@@ -80,8 +86,7 @@ class TradeMonitor:
 
             if pnl_diff > 0 and position.short_qty:
                 logger.warning(f"={event.symbol} Profit: {pnl_diff} USDT")
-                close_positions(position, event.symbol)
-                position = SymbolPosition()
+                self.close_positions(event.symbol)
                 return None
 
             # ---- TRAILING --------
@@ -123,11 +128,7 @@ class TradeMonitor:
             # Проверка на достижение стоп-лосса
             if position.trailing_price is not None and current_price <= position.trailing_price:
                 logger.warning(f"{event.symbol} Trailing stop triggered at: {round(current_price, 8)}")
-                close_positions(position, event.symbol)
-                # Сброс переменных после закрытия позиции
-                position = SymbolPosition()
-
-
+                self.close_positions(event.symbol)
 
         elif event_type == 'ORDER_TRADE_UPDATE':
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
@@ -181,6 +182,55 @@ class TradeMonitor:
         elif event_type == 'ACCOUNT_UPDATE':
             event = UpdateData.parse_obj(message_dict['a'])
             self.handle_account_update(event)
+
+    def close_positions(self, symbol: str):
+
+        position = self.positions[symbol]
+        position_long, position_short = check_position(symbol=symbol)
+        if position_long:
+            close_positions(position, symbol, close_short=False)
+
+        if position_short:
+            close_positions(position, symbol, close_long=False)
+
+        self.positions = {symbol: SymbolPosition()}
+
+    def check_closed_positions_status(self, symbol):
+        position = self.positions[symbol]
+
+        position_long, position_short = check_position(symbol)
+
+        position_long_open_in_db: BinancePosition = get_exist_position(
+            symbol=symbol,
+            position_side=OrderPositionSide.LONG,
+        )
+
+        if position_long_open_in_db:
+            if not position_long.positionAmt:
+                logger.warning(f"no position in {symbol}")
+                save_position(
+                    position=position,
+                    position_side=OrderPositionSide.LONG,
+                    symbol=symbol,
+                    webhook_id=position_long_open_in_db.webhook_id,
+                    status=PositionStatus.CLOSED
+                )
+
+        position_short_open_in_db: BinancePosition = get_exist_position(
+            symbol=symbol,
+            position_side=OrderPositionSide.SHORT,
+        )
+
+        if position_short_open_in_db:
+            if not position_short.positionAmt:
+                logger.warning(f"no position in {symbol}")
+                save_position(
+                    position=position,
+                    position_side=OrderPositionSide.SHORT,
+                    symbol=symbol,
+                    webhook_id=position_short_open_in_db.webhook_id,
+                    status=PositionStatus.CLOSED
+                )
 
     def handle_account_update(self, event: UpdateData):
         from core.schemas.events.base import Balance, Position
