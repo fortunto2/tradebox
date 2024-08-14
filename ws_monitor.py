@@ -95,33 +95,39 @@ class TradeMonitor:
                 position.trailing_1 = Decimal(position.webhook.settings.get('trail_1', 0))
                 position.trailing_2 = Decimal(position.webhook.settings.get('trail_2', 0))
 
-            activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
-            logger.warning(f"{event.symbol} Trailing activation_price: {round(activation_price, 8)}")
+            if position.long_qty > 0:  # Проверка, что позиция открыта
+                activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
+                logger.warning(f"{event.symbol} Trailing activation_price: {round(activation_price, 8)}")
+            else:
+                logger.warning(f"{event.symbol} No open position found, skipping trailing calculation")
+                activation_price = None
+                position.trailing_price = None
 
-            # Активация трейлинга происходит один раз
-            if current_price >= activation_price and position.trailing_price is None:
-                # Если трейлинг еще не активирован, активируем его
-                new_trailing_price = activation_price * (1 - position.trailing_2 / 100)
-                position.trailing_price = new_trailing_price
-                logger.warning(f"{event.symbol} Trailing stop activated at: {round(position.trailing_price, 8)}")
+            # Активация трейлинга происходит один раз и только после пересечения активационной цены
+            if current_price >= activation_price:
+                if position.trailing_price is None:
+                    # Если трейлинг еще не активирован, активируем его
+                    position.trailing_price = activation_price * (1 - position.trailing_2 / 100)
+                    logger.warning(f"{event.symbol} Trailing stop activated at: {round(position.trailing_price, 8)}")
+                else:
+                    # Продолжаем обновлять trailing_price только после активации
+                    if current_price >= position.trailing_price + (
+                            position.trailing_price * Decimal(position.webhook.settings.get('trail_step')) / 100):
+                        new_trailing_price = current_price - (current_price * position.trailing_2 / 100)
+                        if new_trailing_price > position.trailing_price:
+                            position.trailing_price = new_trailing_price
+                            logger.warning(f"{event.symbol} Current price: {round(current_price, 8)}")
+                            logger.warning(
+                                f"{event.symbol} Trailing stop updated to: {round(position.trailing_price, 8)}")
 
-            # Если цена trailing_price инициализирована
-            elif current_price >= activation_price and position.trailing_price is not None:
-                # Продолжаем обновлять trailing_price
-                if current_price >= position.trailing_price + (
-                        position.trailing_price * Decimal(position.webhook.settings.get('trail_step')) / 100):
-                    new_trailing_price = current_price - (current_price * position.trailing_2 / 100)
-                    if new_trailing_price > position.trailing_price:
-                        position.trailing_price = new_trailing_price
-                        logger.warning(f"{event.symbol} Current price: {round(current_price, 8)}")
-                        logger.warning(
-                        f"{event.symbol} Trailing stop updated to: {round(position.trailing_price, 8)}")
+            # Проверка на достижение стоп-лосса
+            if position.trailing_price is not None and current_price <= position.trailing_price:
+                logger.warning(f"{event.symbol} Trailing stop triggered at: {round(current_price, 8)}")
+                close_positions(position, event.symbol)
+                # Сброс переменных после закрытия позиции
+                position = SymbolPosition()
 
-                # Проверка на достижение стоп-лосса
-                if current_price <= position.trailing_price:
-                    logger.warning(f"{event.symbol} Trailing stop triggered at: {round(current_price, 8)}")
-                    close_positions(position, event.symbol)
-                    position = SymbolPosition()
+
 
         elif event_type == 'ORDER_TRADE_UPDATE':
             event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
