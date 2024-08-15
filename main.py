@@ -117,7 +117,7 @@ async def on_startup():
         SQLModel.metadata.create_all(sync_engine)
 
     #     check dual mode
-    dual_mode = check_position_side_dual()
+    dual_mode = await check_position_side_dual()
     if not dual_mode:
         raise HTTPException(status_code=403, detail="Failed to set dual mode, check Binance settings!")
 
@@ -142,7 +142,7 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     # todo: check if position already exists in db
     # если слишком быстро пришло много вебхуков на один символ, все отработают
 
-    position_long, _ = check_position(symbol=symbol)
+    position_long, _ = await check_position(symbol=symbol)
     position_long: LongPosition
 
     if float(position_long.entryPrice) > 0:

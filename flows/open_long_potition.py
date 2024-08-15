@@ -20,14 +20,14 @@ async def open_long_position(payload: WebhookPayload, webhook_id, position_long:
             logger.error("Недостаточно средств для открытия позиции.")
             return False
 
-        first_order = create_long_market_order(
+        first_order = await create_long_market_order(
             symbol=payload.symbol,
             quantity=payload.open.amount,
             leverage=payload.open.leverage,
             webhook_id=webhook_id
         )
 
-        tp_order = create_long_tp_order.submit(
+        tp_order = await create_long_tp_order.submit(
             symbol=payload.symbol,
             tp=payload.settings.tp,
             leverage=payload.open.leverage,
@@ -35,7 +35,7 @@ async def open_long_position(payload: WebhookPayload, webhook_id, position_long:
         )
 
         # первый запуск создание пары ордеров лимитных по сетке
-        grid_make_long_limit_order(
+        await grid_make_long_limit_order(
             webhook_id=webhook_id,
             payload=payload,
         )

@@ -15,13 +15,13 @@ from core.clients.db_sync import execute_sqlmodel_query, execute_sqlmodel_query_
 
 
 @task
-def open_short_position_loop(
+async def open_short_position_loop(
         payload: WebhookPayload,
         webhook_id,
         order_binance_id: str,
 ):
 
-    pnl = get_position_closed_pnl(payload.symbol, int(order_binance_id))
+    pnl = await get_position_closed_pnl(payload.symbol, int(order_binance_id))
     print("pnl:", pnl)
 
     extramarg = Decimal(payload.settings.extramarg) - abs(pnl)
@@ -39,7 +39,7 @@ def open_short_position_loop(
     quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
 
     # только один раз, когда хватает денег
-    hedge_stop_order = create_short_market_stop_order.submit(
+    hedge_stop_order = await create_short_market_stop_order.submit(
         symbol=payload.symbol,
         price=hedge_price,
         quantity=quantity,
@@ -110,7 +110,7 @@ def check_orders_in_the_grid(payload: WebhookPayload, webhook_id):
 
 
 @task
-def grid_make_long_limit_order(
+async def grid_make_long_limit_order(
         webhook_id,
         payload: WebhookPayload):
     """
@@ -119,7 +119,7 @@ def grid_make_long_limit_order(
     :return: Вернет True если есть еще ордера в сетке, False если последний ордер
     """
 
-    def create_limit_order(session):
+    async def create_limit_order(session):
         if not payload:
             print("payload not found, webhook_id:", webhook_id)
             return False
@@ -131,7 +131,7 @@ def grid_make_long_limit_order(
         else:
             price, quantity = grid[len(filled_orders)]
 
-        limit_order = create_long_limit_order.submit(
+        limit_order = await create_long_limit_order.submit(
             symbol=payload.symbol,
             price=price,
             quantity=quantity,
@@ -145,7 +145,7 @@ def grid_make_long_limit_order(
 
             time.sleep(0.5)
 
-            create_short_market_stop_order.submit(
+            await create_short_market_stop_order.submit(
                 symbol=payload.symbol,
                 price=short_order_price,
                 quantity=short_order_amount,

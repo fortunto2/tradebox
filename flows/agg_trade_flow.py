@@ -11,19 +11,19 @@ from flows.tasks.orders_create import create_short_market_order, create_long_mar
 
 
 @flow(task_runner=ConcurrentTaskRunner())
-def close_positions(position: SymbolPosition, symbol: str, close_short=True, close_long=True):
+async def close_positions(position: SymbolPosition, symbol: str, close_short=True, close_long=True):
 
     with tags(symbol):
         logger = get_run_logger()
 
-        status_cancel = cancel_open_orders(symbol=symbol)
+        status_cancel = await cancel_open_orders(symbol=symbol)
         webhook = get_webhook_last(symbol)
         leverage = webhook.open.get('leverage', webhook.open['leverage'])
 
         logger.info(f">>> Cancel all open orders: {status_cancel}")
 
         if close_short:
-            create_short_market_order.submit(
+            await create_short_market_order.submit(
                 symbol=symbol,
                 quantity=abs(position.short_qty),
                 leverage=leverage,
@@ -31,7 +31,7 @@ def close_positions(position: SymbolPosition, symbol: str, close_short=True, clo
                 side=OrderSide.BUY
             )
         if close_long:
-            create_long_market_order.submit(
+            await create_long_market_order.submit(
                 symbol=symbol,
                 quantity=position.long_qty,
                 leverage=leverage,

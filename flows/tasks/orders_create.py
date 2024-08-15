@@ -18,7 +18,7 @@ sys.path.append('')
 
 
 @task
-def create_long_market_order(
+async def create_long_market_order(
         symbol: str,
         quantity: Decimal,
         leverage: int,
@@ -27,7 +27,7 @@ def create_long_market_order(
 ) -> Order:
     print("Market order LONG:")
 
-    def create_order(session):
+    async def create_order(session):
         market_order = Order(
             position_side=OrderPositionSide.LONG,
             side=side,
@@ -39,10 +39,10 @@ def create_long_market_order(
             order_number=0
         )
 
-        order_binance_id = create_order_binance(market_order)
+        order_binance_id = await create_order_binance(market_order)
         market_order.binance_id = order_binance_id
 
-        position_long, _ = check_position(symbol=symbol)
+        position_long, _ = await check_position(symbol=symbol)
         position_long: LongPosition
 
         if position_long:
@@ -60,16 +60,16 @@ def create_long_market_order(
 
 
 @task
-def create_short_market_order(
+async def create_short_market_order(
         symbol: str,
         quantity: Decimal,
         leverage: int,
         webhook_id,
         side: OrderSide = OrderSide.SELL
 ):
-    def create_order(session):
+    async def create_order(session):
         # Check existing position
-        _, position_short = check_position(symbol=symbol)
+        _, position_short = await check_position(symbol=symbol)
 
         if not position_short or position_short.positionAmt == 0:
             logging.error(f"No open short position to reduce for symbol: {symbol}")
@@ -86,7 +86,7 @@ def create_short_market_order(
             order_number=0
         )
 
-        order_binance_id = create_order_binance(market_order)
+        order_binance_id = await create_order_binance(market_order)
         market_order.binance_id = order_binance_id
 
         if position_short:
@@ -103,7 +103,7 @@ def create_short_market_order(
 
 
 @task
-def create_long_tp_order(
+async def create_long_tp_order(
         symbol: str,
         tp: Decimal,
         leverage: int,
@@ -112,11 +112,11 @@ def create_long_tp_order(
 ) -> Order:
     print("Take profit order:")
 
-    def create_order(session):
+    async def create_order(session):
         orders = db_get_all_order(webhook_id, OrderStatus.IN_PROGRESS, OrderType.LONG_TAKE_PROFIT)
         for order in orders:
             try:
-                result = cancel_order_binance(symbol, order.binance_id)
+                result = await cancel_order_binance(symbol, order.binance_id)
                 if result['status'] == 'CANCELED':
                     order.status = OrderStatus.CANCELED
             except Exception as e:
@@ -124,7 +124,7 @@ def create_long_tp_order(
                 logging.error(f"Error canceling order: {e}")
 
         if not position:
-            position_long, _ = check_position(symbol=symbol)
+            position_long, _ = await check_position(symbol=symbol)
             position_long: LongPosition
 
             long_entry = position_long.entryPrice
@@ -146,7 +146,7 @@ def create_long_tp_order(
             price=tp_price
         )
 
-        take_profit_order.binance_id = create_order_binance(take_profit_order)
+        take_profit_order.binance_id = await create_order_binance(take_profit_order)
         take_profit_order.status = OrderStatus.IN_PROGRESS
 
         pprint(take_profit_order.model_dump())
@@ -158,7 +158,7 @@ def create_long_tp_order(
 
 
 @task
-def create_long_limit_order(
+async def create_long_limit_order(
         symbol: str,
         price: Decimal,
         quantity: Decimal,
@@ -167,7 +167,7 @@ def create_long_limit_order(
 ) -> Order:
     print("LONG-BUY-LIMIT order:")
 
-    def create_order(session):
+    async def create_order(session):
         limit_order = Order(
             position_side=OrderPositionSide.LONG,
             side=OrderSide.BUY,
@@ -178,7 +178,7 @@ def create_long_limit_order(
             leverage=leverage,
             webhook_id=webhook_id,
         )
-        limit_order.binance_id = create_order_binance(limit_order)
+        limit_order.binance_id = await create_order_binance(limit_order)
         limit_order.status = OrderStatus.IN_PROGRESS
 
         pprint(limit_order.model_dump())
@@ -191,7 +191,7 @@ def create_long_limit_order(
 
 
 @task
-def create_short_market_stop_order(
+async def create_short_market_stop_order(
         symbol: str,
         price: Decimal,
         quantity: Decimal,
@@ -201,7 +201,7 @@ def create_short_market_stop_order(
     # open short position
     print("Creating SHORT STOP order:")
 
-    def create_order(session):
+    async def create_order(session):
         order = Order(
             position_side=OrderPositionSide.SHORT,
             side=OrderSide.SELL,
@@ -213,7 +213,7 @@ def create_short_market_stop_order(
             webhook_id=webhook_id,
         )
 
-        order.binance_id = create_order_binance(order)
+        order.binance_id = await create_order_binance(order)
         order.status = OrderStatus.IN_PROGRESS
 
         pprint(order.model_dump())
@@ -226,7 +226,7 @@ def create_short_market_stop_order(
 
 
 @task
-def create_short_market_stop_loss_order(
+async def create_short_market_stop_loss_order(
         symbol: str,
         sl_short: float,
         leverage: int,
@@ -236,7 +236,7 @@ def create_short_market_stop_loss_order(
 ) -> Order:
     print("SHORT-BUY:")
 
-    def create_order(session):
+    async def create_order(session):
 
         price_position = Decimal(position.short_entry) * (1 + Decimal(sl_short) / 100)
         quantity = abs(position.short_qty)
@@ -255,7 +255,7 @@ def create_short_market_stop_loss_order(
         )
 
         try:
-            order.binance_id = create_order_binance(order)
+            order.binance_id = await create_order_binance(order)
         except Exception as e:
             print(e)
         order.status = OrderStatus.IN_PROGRESS

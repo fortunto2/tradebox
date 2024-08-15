@@ -3,3 +3,6 @@
 .env
 *.db
 _old/
+.vscode
+**/__pycache__/
+app.log

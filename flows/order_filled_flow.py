@@ -27,7 +27,7 @@ def handle_order_update(event):
 
 
 @flow(task_runner=ConcurrentTaskRunner())
-def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
+async def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
     with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
         with SessionLocal() as session:
 
@@ -76,7 +76,7 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
 
             elif order.type == OrderType.LONG_LIMIT:
                 logger.info(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
-                tp_order = create_long_tp_order.submit(
+                tp_order = await create_long_tp_order.submit(
                     symbol=payload.symbol,
                     tp=payload.settings.tp,
                     leverage=payload.open.leverage,
@@ -87,7 +87,7 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
                     payload, webhook_id)
                 if len(grid) > len(filled_orders_in_db):
 
-                    grid_make_long_limit_order.submit(
+                    await grid_make_long_limit_order.submit(
                         webhook_id=webhook_id,
                         payload=payload
                     )
@@ -97,13 +97,13 @@ def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition):
 
             elif order.type == OrderType.SHORT_MARKET_STOP_LOSS:
                 logger.info(f"Order {order_binance_id} SHORT_MARKET_STOP_LOSS start make_hedge_by_pnl")
-                open_short_position_loop(
+                await open_short_position_loop(
                     payload=payload,
                     webhook_id=order.webhook_id,
                     order_binance_id=order_binance_id,
                 )
             elif order.type == OrderType.SHORT_LIMIT or order.type == OrderType.SHORT_MARKET_STOP_OPEN:
-                short_stop_loss_order = create_short_market_stop_loss_order(
+                short_stop_loss_order = await create_short_market_stop_loss_order(
                     symbol=payload.symbol,
                     sl_short=payload.settings.sl_short,
                     leverage=payload.open.leverage,

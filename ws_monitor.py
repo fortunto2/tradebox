@@ -1,9 +1,15 @@
+import asyncio
 from typing import List, Dict
+from decimal import Decimal
+import json
 
-from pydantic import BaseModel, Field
+import sentry_sdk
+from binance import AsyncClient, BinanceSocketManager
+from binance.exceptions import BinanceAPIException
 
-from core.models.monitor import TradeMonitorBase, SymbolPosition
-from core.models.orders import OrderType
+from core.models.binance_position import PositionStatus, BinancePosition
+from core.models.monitor import SymbolPosition
+from core.models.orders import OrderType, OrderPositionSide, Order
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.schemas.events.account_update import UpdateData
@@ -11,182 +17,69 @@ import json
 from decimal import Decimal
 from config import get_settings
 from core.schemas.position import LongPosition, ShortPosition
+from core.views.handle_orders import get_webhook_last, db_get_order_binance_position_id
+from core.views.handle_positions import get_exist_position, save_position
 from flows.order_new_flow import order_new_flow
-from flows.tasks.binance_futures import client, check_position
+from flows.tasks.binance_futures import client, check_position, get_order_id
 from core.logger import logger
-from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
 from flows.agg_trade_flow import close_positions
 from flows.order_filled_flow import order_filled_flow
 from flows.order_cancel_flow import order_cancel_flow
 
-settings = get_settings()
-
-# # Sentry Initialization
-# sentry_sdk.init(
-#     dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
-#     traces_sample_rate=1.0,
-#     profiles_sample_rate=1.0,
-# )
-
-settings = get_settings()
-
 
 class TradeMonitor:
-
-    def __init__(self, symbols: List[str]):
+    def __init__(self, client: AsyncClient, symbols: List[str]):
+        self.client = client
+        self.bsm = BinanceSocketManager(client)
         self.symbols = symbols
         self.positions: Dict[str, SymbolPosition] = {symbol: SymbolPosition() for symbol in symbols}
-        self.client = UMFuturesWebsocketClient(on_message=self.on_message)
-        # super().__init__(symbols)
 
-    def start_monitor_events(self):
-        listen_key = client.new_listen_key().get('listenKey')
-        for symbol in self.symbols:
-            position_long, position_short = check_position(symbol)
-            position_long: LongPosition
-            position_short: ShortPosition
-            if position_long:
-                self.positions[symbol].long_qty = position_long.positionAmt
-                self.positions[symbol].long_entry = position_long.entryPrice
-                logger.warning(
-                    f"{symbol} +LONG -> qty: {self.positions[symbol].long_qty}, Entry price: {self.positions[symbol].long_entry}")
-            if position_short:
-                self.positions[symbol].short_qty = position_short.positionAmt
-                self.positions[symbol].short_entry = position_short.entryPrice
-                logger.warning(
-                    f"{symbol} -SHORT -> qty: {self.positions[symbol].short_qty}, Entry price: {self.positions[symbol].short_entry}")
-            self.client.agg_trade(symbol)
-        self.client.user_data(listen_key=listen_key)
+    async def start_monitor_events(self):
+        tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
+        await asyncio.gather(*tasks)
 
-    def on_message(self, ws, msg):
+    async def monitor_symbol(self, symbol):
+        async with self.bsm.futures_multiplex_socket([f'{symbol.lower()}@aggTrade']) as stream:
+            while True:
+                msg = await stream.recv()
+                if msg:
+                    await self.handle_message(msg)
 
-        message_dict = json.loads(msg)
+    async def handle_message(self, message):
+        message_dict = message.get('data')
         event_type = message_dict.get('e')
-
         if event_type == 'aggTrade':
-            event = AggregatedTradeEvent.parse_obj(message_dict)
-            position: SymbolPosition = self.positions[event.symbol]
-
-            pnl_diff = calculate_pnl(position, event)
-
-            if pnl_diff > 0.25 and position.short_qty:
-                logger.warning(f"=Profit: {pnl_diff} USDT")
-                close_positions(position, event.symbol)
-                self.positions[event.symbol] = SymbolPosition(
-                    long_qty=0,
-                    long_entry=0,
-                    short_qty=0,
-                    short_entry=0
-                )
-
+            await self.handle_agg_trade(AggregatedTradeEvent.parse_obj(message_dict))
         elif event_type == 'ORDER_TRADE_UPDATE':
-            event = OrderTradeUpdate.parse_obj(message_dict.get('o'))
-            if event.symbol not in self.symbols:
-                return None
-
-            position: SymbolPosition = self.positions[event.symbol]
-
-            if event.order_status == 'FILLED':
-                if event.order_type == 'MARKET' and event.position_side == 'LONG':
-                    logger.warning(f"Order Market Filled: {event.order_status}, {event.order_type}")
-                    return None
-                order_filled_flow(event=event, position=position)
-
-            elif event.order_status == 'CANCELED':
-                logger.warning(f"Order Canceled: {event.order_status}, {event.order_type}")
-                order_cancel_flow(event)
-
-            elif event.order_status == 'REJECTED':
-                logger.warning(f"Order Rejected: {event.order_status}, {event.order_type}")
-            elif event.order_status == 'EXPIRED':
-                logger.warning(f"Order Expired: {event.order_status}, {event.order_type}")
-            elif event.order_status == 'NEW':
-                logger.warning(f"Order New: {event.order_status}, {event.order_type}")
-
-                our_order_type = None
-                # todo: сделать сюда все типы наш-бинанс, и проверку вначале делать чтоб такого ордера в базе нет
-                # choise from OrderType by event
-                if event.position_side == 'SHORT' and event.side == 'SELL' and event.order_type == 'STOP':
-                    our_order_type = OrderType.SHORT_LIMIT
-                elif event.order_type == 'STOP_MARKET' and event.side == 'SELL':
-                    our_order_type = OrderType.SHORT_MARKET_STOP_OPEN
-                elif event.order_type == 'STOP_MARKET' and event.side == 'BUY':
-                    our_order_type = OrderType.SHORT_MARKET_STOP_LOSS
-
-                if our_order_type:
-                    order_new_flow(event, our_order_type)
-
+            await self.handle_order_update(OrderTradeUpdate.parse_obj(message_dict.get('o')))
         elif event_type == 'ACCOUNT_UPDATE':
-            event = UpdateData.parse_obj(message_dict['a'])
-            self.handle_account_update(event)
+            await self.handle_account_update(UpdateData.parse_obj(message_dict['a']))
 
-    def handle_account_update(self, event: UpdateData):
-        for position in event.positions:
-            symbol = position.symbol
+    async def handle_agg_trade(self, event: AggregatedTradeEvent):
+        position = self.positions.get(event.symbol)
+        if position:
+            current_price = Decimal(event.price)
+            await self.process_trade_event(position, current_price)
 
-            if symbol not in self.positions:
-                continue
+    async def handle_order_update(self, event: OrderTradeUpdate):
+        # Processing order updates here
+        pass
 
-            if position.position_side == 'LONG':
-                if position.position_amount != self.positions[symbol].long_qty:
-                    logger.warning(
-                        f"Changed position in {symbol} from {self.positions[symbol].long_qty} to {position.position_amount}")
-                self.positions[symbol].long_qty = Decimal(position.position_amount)
-                self.positions[symbol].long_entry = Decimal(position.breakeven_price)
-                logger.info(f'UPDATE Long PNL: {position.unrealized_pnl}')
-                logger.info(position)
+    async def handle_account_update(self, event: UpdateData):
+        # Process account updates here
+        pass
 
-            elif position.position_side == 'SHORT':
-                if position.position_amount != self.positions[symbol].short_qty:
-                    logger.warning(
-                        f"Changed position in {symbol} from {self.positions[symbol].short_qty} to {position.position_amount}")
-                self.positions[symbol].short_qty = Decimal(position.position_amount)
-                self.positions[symbol].short_entry = Decimal(position.breakeven_price)
-                logger.info(f'UPDATE Short PNL: {position.unrealized_pnl}')
-                logger.info(position)
+    async def process_trade_event(self, position, current_price):
+        # Process trade event logic
+        pass
 
 
-def calculate_pnl(position: SymbolPosition, event: AggregatedTradeEvent):
-    trade_price = Decimal(event.price)
-    long_pnl = 0
-    short_pnl = 0
-
-    if position.long_qty != 0:
-        long_pnl = round((trade_price - position.long_entry) * position.long_qty, 2)
-
-    if position.short_qty != 0:
-        short_pnl = round((trade_price - position.short_entry) * position.short_qty, 2)
-
-    return round(long_pnl + short_pnl, 2)
-
-
-def check_orders(symbols: List[str]):
-    for symbol in symbols:
-        position_long, position_short = check_position(symbol)
-        if not position_long.positionAmt:
-            logger.warning(f"no position in {symbol}")
-            # orders = session.exec(select(Order).where(Order.status == OrderStatus.IN_PROGRESS)).all()
-            # for order in orders:
-            #     def cancel_order(session):
-            #         order.status = OrderStatus.CANCELED
-            #         session.add(order)
-            #         session.commit()
-            #     execute_sqlmodel_query(cancel_order)
-
-
-import click
-
-
-@click.command()
-@click.option("--symbol", prompt="Symbol", default="1000FLOKIUSDT", show_default=True,
-              help="Enter the trading symbol (default: 1000FLOKIUSDT)")
-def main(symbol):
-
-    # symbols = ['UNFIUSDT', '1000FLOKIUSDT', '1000LUNCUSDT', '1000SHIBUSDT', '1000XECUSDT', '1INCHUSDT']
-    check_orders([symbol])
-    trade_monitor = TradeMonitor([symbol])
-    trade_monitor.start_monitor_events()
+async def main():
+    client = await AsyncClient.create()
+    symbols = ['1000FLOKIUSDT']  # Example symbols
+    trade_monitor = TradeMonitor(client, symbols)
+    await trade_monitor.start_monitor_events()
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
