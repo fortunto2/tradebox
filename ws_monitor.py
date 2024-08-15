@@ -202,6 +202,7 @@ class TradeMonitor:
 
         position_long_open_in_db: BinancePosition = get_exist_position(
             symbol=symbol,
+            webhook_id=position.webhook.id,
             position_side=OrderPositionSide.LONG,
         )
 
@@ -218,6 +219,7 @@ class TradeMonitor:
 
         position_short_open_in_db: BinancePosition = get_exist_position(
             symbol=symbol,
+            webhook_id=position.webhook.id,
             position_side=OrderPositionSide.SHORT,
         )
 
