@@ -78,6 +78,7 @@ class BinancePositionAdmin(ModelView, model=BinancePosition):
                    BinancePosition.position_qty,
                    BinancePosition.entry_price,
                    BinancePosition.entry_break_price,
+                   BinancePosition.activation_price,
                    BinancePosition.pnl,
                    BinancePosition.status,
                    BinancePosition.created_at,
