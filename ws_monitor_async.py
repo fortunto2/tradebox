@@ -151,7 +151,7 @@ class TradeMonitor:
                     position_side=OrderPositionSide.LONG,
                     symbol=symbol,
                     webhook_id=position.webhook.id,
-                    status=PositionStatus.OPEN
+                    status=PositionStatus.UPDATED
                 )
         else:
             logger.warning(f"{symbol} No open position found, skipping trailing calculation")
