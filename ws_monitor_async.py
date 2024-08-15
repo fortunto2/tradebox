@@ -297,15 +297,27 @@ class TradeMonitor:
         return round(long_pnl + short_pnl, 2)
 
 
-async def main():
+async def start(symbols):
     client = await AsyncClient.create(
         api_key=settings.BINANCE_API_KEY,
         api_secret=settings.BINANCE_API_SECRET
     )
-    symbols = ['1000FLOKIUSDT']  # Example symbols
     trade_monitor = TradeMonitor(client, symbols)
     await trade_monitor.start_monitor_events()
 
 
+
+import click
+
+
+@click.command()
+@click.option("--symbol", prompt="Symbol", default="1000FLOKIUSDT", show_default=True,
+              help="Enter the trading symbol (default: 1000FLOKIUSDT)")
+def main(symbol):
+    asyncio.run(start([symbol]))
+
+
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()
+
+
