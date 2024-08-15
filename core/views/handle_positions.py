@@ -31,6 +31,7 @@ def save_position(
 
             if position_exist:
                 #     update existing position
+                position_exist.activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
                 position_exist.status = status
                 position_exist.updated_at = datetime.utcnow()
 
@@ -44,7 +45,6 @@ def save_position(
                     position_exist.position_qty = position.long_qty
                     position_exist.entry_price = position.long_entry
                     position_exist.entry_break_price = position.long_break_even_price
-                    position_exist.pnl = position.long_pnl
 
                 position = position_exist
 
@@ -59,6 +59,7 @@ def save_position(
                     pnl=position.long_pnl,
                     webhook_id=webhook_id,
                     status=status,
+                    activation_price=position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100),
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()
                 )
@@ -69,6 +70,7 @@ def save_position(
                 #     update existing position
                 position_exist.status = status
                 position_exist.updated_at = datetime.utcnow()
+                position_exist.activation_price = position.short_adjusted_break_even_price * (1 + position.trailing_1 / 100)
 
                 if status == PositionStatus.CLOSED or position.short_qty == 0:
                     position_exist.closed_at = datetime.utcnow()
@@ -79,7 +81,6 @@ def save_position(
                     position_exist.position_qty = position.short_qty
                     position_exist.entry_price = position.short_entry
                     position_exist.entry_break_price = position.short_break_even_price
-                    position_exist.pnl = position.short_pnl
 
                 position = position_exist
 
@@ -93,6 +94,7 @@ def save_position(
                     entry_break_price=position.short_break_even_price,
                     pnl=position.short_pnl,
                     webhook_id=webhook_id,
+                    activation_price=position.short_adjusted_break_even_price * (1 + position.trailing_1 / 100),
                     status=status,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()

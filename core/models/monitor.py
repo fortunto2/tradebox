@@ -23,6 +23,7 @@ class SymbolPosition(BaseModel):
     trailing_1: Decimal = Field(default_factory=lambda: Decimal(0))
     trailing_2: Decimal = Field(default_factory=lambda: Decimal(0))
     trailing_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    activation_price: Decimal = Field(default_factory=lambda: Decimal(0))
 
     price_precision: int = 6
 

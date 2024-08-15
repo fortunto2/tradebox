@@ -138,21 +138,32 @@ class TradeMonitor:
                 return None
 
         if position.trailing_1 == 0 and position.trailing_2 == 0:
-            position.trailing_1 = Decimal(position.webhook.settings.get('trail_1', 0))
+            position.trailing_1 = Decimal(position.webhook.settings.get('trail_1', 0)) - Decimal(0.025)
             position.trailing_2 = Decimal(position.webhook.settings.get('trail_2', 0))
 
         if position.long_qty > 0:
             activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
-            logger.warning(f"{symbol} Trailing activation_price: {round(activation_price, 8)}")
+            if activation_price != position.activation_price:
+                logger.warning(f"{symbol} Trailing activation_price: {round(activation_price, 8)}")
+                position.activation_price = activation_price
+                save_position(
+                    position=position,
+                    position_side=OrderPositionSide.LONG,
+                    symbol=symbol,
+                    webhook_id=position.webhook.id,
+                    status=PositionStatus.OPEN
+                )
         else:
             logger.warning(f"{symbol} No open position found, skipping trailing calculation")
-            activation_price = None
+            position.activation_price = None
             position.trailing_price = None
+            return
 
         if current_price >= activation_price:
             if position.trailing_price is None:
                 position.trailing_price = activation_price * (1 - position.trailing_2 / 100)
                 logger.warning(f"{symbol} Trailing stop activated at: {round(position.trailing_price, 8)}")
+
             else:
                 if current_price >= position.trailing_price + (
                         position.trailing_price * Decimal(position.webhook.settings.get('trail_step')) / 100):

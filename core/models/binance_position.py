@@ -24,6 +24,7 @@ class BinancePosition(SQLModel, table=True):
     status: PositionStatus = PositionStatus.OPEN
 
     pnl: float = Field(default=0)
+    activation_price: float = Field(default=0)
 
     orders: List[Order] = Relationship(sa_relationship_kwargs={"back_populates": "binance_position"})
 
