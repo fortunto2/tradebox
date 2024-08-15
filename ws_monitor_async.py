@@ -116,7 +116,7 @@ class TradeMonitor:
             logger.info(f"Unhandled event type: {event_type}")
 
     async def handle_agg_trade(self, event: AggregatedTradeEvent):
-        position = self.positions.get(event.symbol)
+        position: SymbolPosition = self.positions.get(event.symbol)
         if not position or position.long_qty == 0:
             return None
 
@@ -143,7 +143,7 @@ class TradeMonitor:
 
         if position.long_qty > 0:
             activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
-            logger.info(f"{symbol} Trailing activation_price: {round(activation_price, 8)}")
+            logger.warning(f"{symbol} Trailing activation_price: {round(activation_price, 8)}")
         else:
             logger.warning(f"{symbol} No open position found, skipping trailing calculation")
             activation_price = None
