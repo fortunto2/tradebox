@@ -330,7 +330,7 @@ class TradeMonitor:
                     status=PositionStatus.CLOSED
                 )
 
-    def calculate_pnl(position: SymbolPosition, current_price: Decimal):
+    def calculate_pnl(self, position: SymbolPosition, current_price: Decimal):
         long_pnl = 0
         short_pnl = 0
 
