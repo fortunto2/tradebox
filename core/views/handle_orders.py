@@ -75,7 +75,7 @@ def get_webhook(webhook_id: str) -> WebHook:
     return execute_sqlmodel_query_single(query_func)
 
 
-def get_webhook_last(symbol: str) -> WebHook:
+async def get_webhook_last(symbol: str) -> WebHook:
     def query_func(session):
         query = select(WebHook).where(WebHook.symbol == symbol).order_by(WebHook.id.desc())
         result = session.exec(query)

@@ -83,7 +83,7 @@ class TradeMonitor:
             await self.client.close_connection()
 
     async def initialize_positions(self, symbol: str):
-        self.positions[symbol].webhook = get_webhook_last(symbol)
+        self.positions[symbol].webhook = await get_webhook_last(symbol)
 
         position_long, position_short = check_position(symbol)
         if position_long:
@@ -127,7 +127,7 @@ class TradeMonitor:
 
     async def handle_trailing(self, position, symbol, current_price):
         if not position.webhook:
-            position.webhook = get_webhook_last(symbol)
+            position.webhook = await get_webhook_last(symbol)
             if not position.webhook:
                 return None
 
@@ -274,7 +274,7 @@ class TradeMonitor:
 
     async def close_positions(self, symbol: str):
         position = self.positions.get(symbol)
-        position_long, position_short = await check_position(symbol=symbol)
+        position_long, position_short = check_position(symbol=symbol)
         if position_long:
             await close_positions(position, symbol, close_short=False)
         if position_short:
