@@ -47,6 +47,11 @@ class TradeMonitor:
         await asyncio.gather(*tasks)
 
     async def monitor_symbol(self, symbol: str):
+        """
+        https://developers.binance.com/docs/binance-spot-api-docs/web-socket-streams
+        :param symbol:
+        :return:
+        """
         try:
             await self.initialize_positions(symbol)
 

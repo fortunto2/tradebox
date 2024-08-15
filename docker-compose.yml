@@ -22,42 +22,42 @@ services:
   ws-monitor:
     <<: *backend
     ports: []
-    command: python ws_monitor.py --symbol=1000FLOKIUSDT
+    command: python ws_monitor_async.py --symbol=1000FLOKIUSDT
     healthcheck:
       test: [] # Properly defining an empty healthcheck mapping
 
   ws-monitor2:
     <<: *backend
     ports: []
-    command: python ws_monitor.py --symbol=1000LUNCUSDT
+    command: python ws_monitor_async.py --symbol=1000LUNCUSDT
     healthcheck:
       test: [] # Properly defining an empty healthcheck mapping
 
   ws-monitor3:
     <<: *backend
     ports: []
-    command: python ws_monitor.py --symbol=1000SHIBUSDT
+    command: python ws_monitor_async.py --symbol=1000SHIBUSDT
     healthcheck:
       test: [] # Properly defining an empty healthcheck mapping
 
   ws-monitor4:
     <<: *backend
     ports: []
-    command: python ws_monitor.py --symbol=1000XECUSDT
+    command: python ws_monitor_async.py --symbol=1000XECUSDT
     healthcheck:
       test: [] # Properly defining an empty healthcheck mapping
 
   ws-monitor5:
     <<: *backend
     ports: []
-    command: python ws_monitor.py --symbol=1INCHUSDT
+    command: python ws_monitor_async.py --symbol=1INCHUSDT
     healthcheck:
       test: [] # Properly defining an empty healthcheck mapping
 
   ws-monitor6:
     <<: *backend
     ports: []
-    command: python ws_monitor.py --symbol=1000PEPEUSDT
+    command: python ws_monitor_async.py --symbol=1000PEPEUSDT
     healthcheck:
       test: [] # Properly defining an empty healthcheck mapping
 
