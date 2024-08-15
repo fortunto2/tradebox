@@ -52,40 +52,39 @@ class TradeMonitor:
         :param symbol:
         :return:
         """
-        try:
-            await self.initialize_positions(symbol)
+        await self.initialize_positions(symbol)
 
-            streams = [
-                f'{symbol.lower()}@aggTrade',  # Stream для агрегированных торгов
-            ]
+        streams = [
+            f'{symbol.lower()}@aggTrade',  # Stream для агрегированных торгов
+        ]
 
-            async with self.bsm.futures_multiplex_socket(streams) as stream:
-                while True:
-                    msg = await stream.recv()
-                    if msg:
-                        await self.on_message(msg.get('data'))
+        async with self.bsm.futures_multiplex_socket(streams) as stream:
+            while True:
+                msg = await stream.recv()
+                if msg:
+                    await self.on_message(msg.get('data'))
 
-        except BinanceAPIException as e:
-            logger.error(f"Binance API error for symbol {symbol}: {e}")
-        except Exception as e:
-            logger.error(f"Error in monitor_symbol for {symbol}: {e}")
-        finally:
-            await self.client.close_connection()
+        # except BinanceAPIException as e:
+        #     logger.error(f"Binance API error for symbol {symbol}: {e}")
+        # except Exception as e:
+        #     logger.error(f"Error in monitor_symbol for {symbol}: {e}")
+        # finally:
+        #     await self.client.close_connection()
 
     async def monitor_user_data(self):
-        try:
-            async with self.bsm.futures_user_socket() as user_stream:
-                while True:
-                    user_msg = await user_stream.recv()
-                    if user_msg:
-                        await self.on_message(user_msg)
 
-        except BinanceAPIException as e:
-            logger.error(f"Binance API error in user data stream: {e}")
-        except Exception as e:
-            logger.error(f"Error in user data stream: {e}")
-        finally:
-            await self.client.close_connection()
+        async with self.bsm.futures_user_socket() as user_stream:
+            while True:
+                user_msg = await user_stream.recv()
+                if user_msg:
+                    await self.on_message(user_msg)
+
+        # except BinanceAPIException as e:
+        #     logger.error(f"Binance API error in user data stream: {e}")
+        # except Exception as e:
+        #     logger.error(f"Error in user data stream: {e}")
+        # finally:
+        #     await self.client.close_connection()
 
     async def initialize_positions(self, symbol: str):
         self.positions[symbol].webhook = get_webhook_last(symbol)

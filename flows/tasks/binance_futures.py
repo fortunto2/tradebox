@@ -169,7 +169,7 @@ def create_order_binance(order: Order, return_full_response=False, trail_follow_
 
 
 
-@task
+# @task
 def cancel_order_binance(symbol, order_id):
     """
     https://binance-docs.github.io/apidocs/futures/en/#cancel-order-trade
@@ -235,13 +235,13 @@ def check_position(symbol: str) -> ():
     return None, None
 
 
-@task
+# @task
 def get_order_id(symbol, order_id):
     order = client.query_order(symbol=symbol, orderId=order_id)
     return order
 
 
-@task
+# @task
 def check_all_orders(symbol: str, orderId: int = None):
     """
     Monitor all  orders.
@@ -260,7 +260,7 @@ def check_all_orders(symbol: str, orderId: int = None):
 
 
 
-@task
+# @task
 def get_last_order_in_position(symbol: str):
     """
     Monitor all  orders.
@@ -278,7 +278,7 @@ def get_last_order_in_position(symbol: str):
         return None
 
 
-@task
+# @task
 def get_current_price(symbol: str) -> Decimal:
     try:
         ticker = client.ticker_price(symbol)
@@ -288,14 +288,14 @@ def get_current_price(symbol: str) -> Decimal:
         raise HTTPException(status_code=500, detail="Failed to get current price")
 
 
-@task
+# @task
 def cancel_open_orders(symbol: str) -> dict:
     status = client.cancel_open_orders(symbol=symbol)
     print(f">>> Cancel all open orders: {status}")
     return status
 
 
-@task
+# @task
 def get_position_closed_pnl(symbol: str, order_id: int) -> Decimal:
     orders = client.get_account_trades(symbol=symbol, orderId=order_id)
     return Decimal(orders[0].get('realizedPnl'))
