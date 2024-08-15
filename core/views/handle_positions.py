@@ -11,7 +11,7 @@ from core.models.orders import Order, OrderStatus, OrderType, OrderPositionSide,
 from core.models.monitor import SymbolPosition
 
 
-@task
+# @task
 def save_position(
         position: SymbolPosition,
         position_side: OrderPositionSide,
