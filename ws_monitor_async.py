@@ -102,6 +102,8 @@ class TradeMonitor:
             self.positions[symbol].short_break_even_price = position_short.breakEvenPrice
             logger.warning(f"{symbol} -SHORT -> qty: {self.positions[symbol].short_qty}, Entry price: {self.positions[symbol].short_entry}")
 
+        await self.check_closed_positions_status(symbol)
+
     async def on_message(self, msg):
         event_type = msg.get('e')
 
@@ -291,9 +293,53 @@ class TradeMonitor:
             await close_positions(position, symbol, close_long=False)
         self.positions[symbol] = SymbolPosition()
 
-    def calculate_pnl(self, position: SymbolPosition, current_price: Decimal):
-        long_pnl = position.calculate_pnl_long(current_price) if position.long_qty != 0 else 0
-        short_pnl = position.calculate_pnl_short(current_price) if position.short_qty != 0 else 0
+    async def check_closed_positions_status(self, symbol):
+        position = self.positions.get(symbol)
+
+        position_long, position_short = check_position(symbol)
+
+        position_long_open_in_db: BinancePosition = get_exist_position(
+            symbol=symbol,
+            position_side=OrderPositionSide.LONG,
+        )
+
+        if position_long_open_in_db:
+            if not position_long.positionAmt:
+                logger.warning(f"no position in {symbol}")
+                save_position(
+                    position=position,
+                    position_side=OrderPositionSide.LONG,
+                    symbol=symbol,
+                    webhook_id=position_long_open_in_db.webhook_id,
+                    status=PositionStatus.CLOSED
+                )
+
+        position_short_open_in_db: BinancePosition = get_exist_position(
+            symbol=symbol,
+            position_side=OrderPositionSide.SHORT,
+        )
+
+        if position_short_open_in_db:
+            if not position_short.positionAmt:
+                logger.warning(f"no position in {symbol}")
+                save_position(
+                    position=position,
+                    position_side=OrderPositionSide.SHORT,
+                    symbol=symbol,
+                    webhook_id=position_short_open_in_db.webhook_id,
+                    status=PositionStatus.CLOSED
+                )
+
+    def calculate_pnl(position: SymbolPosition, current_price: Decimal):
+        long_pnl = 0
+        short_pnl = 0
+
+        if position.long_qty != 0:
+            long_pnl = position.calculate_pnl_long(current_price)
+
+        if position.short_qty != 0:
+            short_pnl = position.calculate_pnl_short(current_price)
+
         return round(long_pnl + short_pnl, 2)
 
 
