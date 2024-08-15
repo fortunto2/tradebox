@@ -83,7 +83,7 @@ class TradeMonitor:
             await self.client.close_connection()
 
     async def initialize_positions(self, symbol: str):
-        self.positions[symbol].webhook = await get_webhook_last(symbol)
+        self.positions[symbol].webhook = get_webhook_last(symbol)
 
         position_long, position_short = check_position(symbol)
         if position_long:
@@ -127,7 +127,7 @@ class TradeMonitor:
 
     async def handle_trailing(self, position, symbol, current_price):
         if not position.webhook:
-            position.webhook = await get_webhook_last(symbol)
+            position.webhook = get_webhook_last(symbol)
             if not position.webhook:
                 return None
 
@@ -137,7 +137,7 @@ class TradeMonitor:
 
         if position.long_qty > 0:
             activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
-            logger.debug(f"{symbol} Trailing activation_price: {round(activation_price, 8)}")
+            logger.info(f"{symbol} Trailing activation_price: {round(activation_price, 8)}")
         else:
             logger.warning(f"{symbol} No open position found, skipping trailing calculation")
             activation_price = None
@@ -201,7 +201,12 @@ class TradeMonitor:
                 await order_new_flow(event, our_order_type)
 
     async def handle_account_update(self, event: UpdateData):
-        webhook_id = (await get_webhook_last(event.positions[0].symbol)).id
+
+        if not event.positions:
+            logger.warning("No positions found in account update")
+            return None
+
+        webhook_id = (get_webhook_last(event.positions[0].symbol)).id
         for position in event.positions:
             symbol = position.symbol
             if symbol not in self.positions:
@@ -219,11 +224,11 @@ class TradeMonitor:
         elif position.position_amount == 0:
             logger.warning(f"Close position in {symbol} with {position.position_amount} amount")
             status = PositionStatus.CLOSED
-            position_binance = await get_exist_position(symbol=symbol, webhook_id=webhook_id,
+            position_binance = get_exist_position(symbol=symbol, webhook_id=webhook_id,
                                                         position_side=OrderPositionSide.LONG, check_closed=False)
             if position_binance:
-                last_orders: Order = await db_get_order_binance_position_id(position_binance.id)
-                order_binance = await get_order_id(symbol, last_orders[0].binance_id)
+                last_orders: Order = db_get_order_binance_position_id(position_binance.id)
+                order_binance = get_order_id(symbol, last_orders[0].binance_id)
                 if order_binance:
                     self.positions[symbol].long_pnl = self.positions[symbol].calculate_pnl_long(
                         Decimal(order_binance.get('avgPrice')))
@@ -236,7 +241,7 @@ class TradeMonitor:
         self.positions[symbol].long_entry = Decimal(position.entry_price)
         self.positions[symbol].long_break_even_price = Decimal(position.breakeven_price)
 
-        await save_position(position=self.positions[symbol], position_side=OrderPositionSide.LONG, symbol=symbol,
+        save_position(position=self.positions[symbol], position_side=OrderPositionSide.LONG, symbol=symbol,
                             webhook_id=webhook_id, status=status)
         if status == PositionStatus.CLOSED:
             self.positions[symbol] = SymbolPosition(long_qty=0, long_entry=0, long_break_even_price=0,
@@ -249,11 +254,11 @@ class TradeMonitor:
         elif position.position_amount == 0:
             logger.warning(f"Close position in {symbol} with {position.position_amount} amount")
             status = PositionStatus.CLOSED
-            position_binance = await get_exist_position(symbol=symbol, webhook_id=webhook_id,
+            position_binance = get_exist_position(symbol=symbol, webhook_id=webhook_id,
                                                         position_side=OrderPositionSide.SHORT, check_closed=False)
             if position_binance:
-                last_orders: Order = await db_get_order_binance_position_id(position_binance.id)
-                order_binance = await get_order_id(symbol, last_orders[0].binance_id)
+                last_orders: Order = db_get_order_binance_position_id(position_binance.id)
+                order_binance = get_order_id(symbol, last_orders[0].binance_id)
                 if order_binance:
                     self.positions[symbol].short_pnl = self.positions[symbol].calculate_pnl_short(
                         Decimal(order_binance.get('avgPrice')))
@@ -266,7 +271,7 @@ class TradeMonitor:
         self.positions[symbol].short_entry = Decimal(position.entry_price)
         self.positions[symbol].short_break_even_price = Decimal(position.breakeven_price)
 
-        await save_position(position=self.positions[symbol], position_side=OrderPositionSide.SHORT, symbol=symbol,
+        save_position(position=self.positions[symbol], position_side=OrderPositionSide.SHORT, symbol=symbol,
                             webhook_id=webhook_id, status=status)
         if status == PositionStatus.CLOSED:
             self.positions[symbol] = SymbolPosition(short_qty=0, short_entry=0, short_break_even_price=0,

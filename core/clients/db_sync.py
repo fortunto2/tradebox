@@ -1,11 +1,12 @@
 import json
+import logging
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from pydantic import BaseModel
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session, create_engine
 from config import get_settings
-
 
 def pydantic_serializer(value):
     if isinstance(value, BaseModel):
@@ -22,7 +23,8 @@ settings = get_settings()
 # Create a synchronous SQLAlchemy engine
 sync_engine = create_engine(
     settings.DB_CONNECTION_STR,
-    echo=settings.DEBUG,
+    # echo=settings.DEBUG,
+    echo=False, # не показывать запросы в базу
     future=True,
     json_serializer=pydantic_serializer,
 )

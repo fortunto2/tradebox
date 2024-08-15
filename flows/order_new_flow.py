@@ -16,7 +16,7 @@ async def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
     order_binance_id = str(event.order_id)
     logger.info(f"Order binance_id: {order_binance_id}")
 
-    webhook = await get_webhook_last(event.symbol)
+    webhook = get_webhook_last(event.symbol)
 
     binance_position = get_exist_position(event.symbol, webhook.id, OrderPositionSide(event.position_side), check_closed=False)
     if not binance_position:

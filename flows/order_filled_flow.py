@@ -38,7 +38,7 @@ async def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition, o
             if not order:
                 logger.warning(f"Order not found in DB - {order_binance_id}")
                 if order_type:
-                    order_new_flow(event, order_type)
+                    await order_new_flow(event, order_type)
                 return None
             elif order.status == OrderStatus.FILLED:
                 logger.warning(f"Order already filled - {order_binance_id}")
@@ -77,7 +77,7 @@ async def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition, o
             )
 
             if order.type == OrderType.LONG_TAKE_PROFIT:
-                close_positions(
+                await close_positions(
                     position=position,
                     symbol=event.symbol,
                     close_long=False,

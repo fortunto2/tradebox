@@ -236,6 +236,10 @@ class TradeMonitor:
         from core.schemas.events.base import Balance, Position
         from core.views.handle_positions import save_position
 
+        if not event.positions:
+            logger.warning("No positions found in account update")
+            return None
+
         webhook_id = get_webhook_last(event.positions[0].symbol).id
 
         for position in event.positions:
