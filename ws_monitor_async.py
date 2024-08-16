@@ -284,7 +284,7 @@ class TradeMonitor:
                 long_entry=0,
                 long_break_even_price=0,
                 long_adjusted_break_even_price=0,
-                webhook=None
+                webhook={}
             )
 
     async def update_short_position(self, position, symbol):
@@ -322,7 +322,7 @@ class TradeMonitor:
                 short_entry=0,
                 short_break_even_price=0,
                 short_adjusted_break_even_price=0,
-                webhook=None
+                webhook={}
             )
 
     async def close_positions(self, symbol: str):
@@ -341,7 +341,7 @@ class TradeMonitor:
             short_entry=0,
             short_break_even_price=0,
             short_adjusted_break_even_price=0,
-            webhook=None
+            webhook={}
         )
 
     async def check_closed_positions_status(self, symbol):
