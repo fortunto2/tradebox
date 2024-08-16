@@ -3,8 +3,12 @@ from prefect.task_runners import ConcurrentTaskRunner
 
 from core.grid import calculate_grid_orders
 from core.logger import logger
+from core.models.binance_position import PositionStatus
+from core.models.monitor import SymbolPosition
+from core.models.orders import OrderPositionSide
 from core.schemas.position import LongPosition
 from core.schemas.webhook import WebhookPayload
+from core.views.handle_positions import save_position
 
 from flows.tasks.orders_create import create_long_market_order, create_long_tp_order
 from flows.tasks.orders_processing import grid_make_long_limit_order
@@ -24,7 +28,8 @@ async def open_long_position(payload: WebhookPayload, webhook_id, position_long:
             symbol=payload.symbol,
             quantity=payload.open.amount,
             leverage=payload.open.leverage,
-            webhook_id=webhook_id
+            webhook_id=webhook_id,
+            payload=payload
         )
 
         tp_order = create_long_tp_order.submit(

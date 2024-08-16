@@ -57,34 +57,36 @@ class TradeMonitor:
         streams = [
             f'{symbol.lower()}@aggTrade',  # Stream для агрегированных торгов
         ]
+        try:
 
-        async with self.bsm.futures_multiplex_socket(streams) as stream:
-            while True:
-                msg = await stream.recv()
-                if msg:
-                    await self.on_message(msg.get('data'))
+            async with self.bsm.futures_multiplex_socket(streams) as stream:
+                while True:
+                    msg = await stream.recv()
+                    if msg:
+                        await self.on_message(msg.get('data'))
 
-        # except BinanceAPIException as e:
-        #     logger.error(f"Binance API error for symbol {symbol}: {e}")
-        # except Exception as e:
-        #     logger.error(f"Error in monitor_symbol for {symbol}: {e}")
-        # finally:
-        #     await self.client.close_connection()
+        except BinanceAPIException as e:
+            logger.error(f"Binance API error for symbol {symbol}: {e}")
+        except Exception as e:
+            logger.error(f"Error in monitor_symbol for {symbol}: {e}")
+        finally:
+            await self.client.close_connection()
 
     async def monitor_user_data(self):
 
-        async with self.bsm.futures_user_socket() as user_stream:
-            while True:
-                user_msg = await user_stream.recv()
-                if user_msg:
-                    await self.on_message(user_msg)
+        try:
+            async with self.bsm.futures_user_socket() as user_stream:
+                while True:
+                    user_msg = await user_stream.recv()
+                    if user_msg:
+                        await self.on_message(user_msg)
 
-        # except BinanceAPIException as e:
-        #     logger.error(f"Binance API error in user data stream: {e}")
-        # except Exception as e:
-        #     logger.error(f"Error in user data stream: {e}")
-        # finally:
-        #     await self.client.close_connection()
+        except BinanceAPIException as e:
+            logger.error(f"Binance API error in user data stream: {e}")
+        except Exception as e:
+            logger.error(f"Error in user data stream: {e}")
+        finally:
+            await self.client.close_connection()
 
     async def initialize_positions(self, symbol: str):
         self.positions[symbol].webhook = get_webhook_last(symbol)
@@ -94,12 +96,14 @@ class TradeMonitor:
             self.positions[symbol].long_qty = position_long.positionAmt
             self.positions[symbol].long_entry = position_long.entryPrice
             self.positions[symbol].long_break_even_price = position_long.breakEvenPrice
-            logger.warning(f"{symbol} +LONG -> qty: {self.positions[symbol].long_qty}, Entry price: {self.positions[symbol].long_entry}")
+            logger.warning(
+                f"{symbol} +LONG -> qty: {self.positions[symbol].long_qty}, Entry price: {self.positions[symbol].long_entry}")
         if position_short:
             self.positions[symbol].short_qty = position_short.positionAmt
             self.positions[symbol].short_entry = position_short.entryPrice
             self.positions[symbol].short_break_even_price = position_short.breakEvenPrice
-            logger.warning(f"{symbol} -SHORT -> qty: {self.positions[symbol].short_qty}, Entry price: {self.positions[symbol].short_entry}")
+            logger.warning(
+                f"{symbol} -SHORT -> qty: {self.positions[symbol].short_qty}, Entry price: {self.positions[symbol].short_entry}")
 
         await self.check_closed_positions_status(symbol)
 
@@ -222,27 +226,36 @@ class TradeMonitor:
         if not event.positions:
             logger.warning("No positions found in account update")
             return None
+        symbol = event.positions[0].symbol
+        # if not self.positions[symbol].webhook:
+        self.positions[symbol].webhook = get_webhook_last(symbol)
 
-        webhook_id = (get_webhook_last(event.positions[0].symbol)).id
         for position in event.positions:
             symbol = position.symbol
             if symbol not in self.positions:
                 continue
 
             if position.position_side == 'LONG':
-                await self.update_long_position(position, symbol, webhook_id)
+                await self.update_long_position(position, symbol)
             elif position.position_side == 'SHORT':
-                await self.update_short_position(position, symbol, webhook_id)
+                await self.update_short_position(position, symbol)
 
-    async def update_long_position(self, position, symbol, webhook_id):
+    async def update_long_position(self, position, symbol):
         status = PositionStatus.OPEN
+
+        webhook_id = self.positions[symbol].webhook.id
+
         if position.position_amount != 0 and self.positions[symbol].long_qty == 0:
             logger.warning(f"Open position in {symbol} with {position.position_amount} amount")
         elif position.position_amount == 0:
             logger.warning(f"Close position in {symbol} with {position.position_amount} amount")
             status = PositionStatus.CLOSED
-            position_binance = get_exist_position(symbol=symbol, webhook_id=webhook_id,
-                                                        position_side=OrderPositionSide.LONG, check_closed=False)
+            position_binance = get_exist_position(
+                symbol=symbol,
+                webhook_id=webhook_id,
+                position_side=OrderPositionSide.LONG,
+                check_closed=False
+            )
             if position_binance:
                 last_orders: Order = db_get_order_binance_position_id(position_binance.id)
                 order_binance = get_order_id(symbol, last_orders[0].binance_id)
@@ -258,21 +271,34 @@ class TradeMonitor:
         self.positions[symbol].long_entry = Decimal(position.entry_price)
         self.positions[symbol].long_break_even_price = Decimal(position.breakeven_price)
 
-        save_position(position=self.positions[symbol], position_side=OrderPositionSide.LONG, symbol=symbol,
-                            webhook_id=webhook_id, status=status)
+        save_position(
+            position=self.positions[symbol],
+            position_side=OrderPositionSide.LONG,
+            symbol=symbol,
+            webhook_id=webhook_id,
+            status=status
+        )
         if status == PositionStatus.CLOSED:
-            self.positions[symbol] = SymbolPosition(long_qty=0, long_entry=0, long_break_even_price=0,
-                                                    long_adjusted_break_even_price=0)
+            self.positions[symbol] = SymbolPosition(
+                long_qty=0,
+                long_entry=0,
+                long_break_even_price=0,
+                long_adjusted_break_even_price=0,
+                webhook=None
+            )
 
-    async def update_short_position(self, position, symbol, webhook_id):
+    async def update_short_position(self, position, symbol):
         status = PositionStatus.OPEN
+
+        webhook_id = self.positions[symbol].webhook.id
+
         if position.position_amount != 0 and self.positions[symbol].short_qty == 0:
             logger.warning(f"Open position in {symbol} with {position.position_amount} amount")
         elif position.position_amount == 0:
             logger.warning(f"Close position in {symbol} with {position.position_amount} amount")
             status = PositionStatus.CLOSED
             position_binance = get_exist_position(symbol=symbol, webhook_id=webhook_id,
-                                                        position_side=OrderPositionSide.SHORT, check_closed=False)
+                                                  position_side=OrderPositionSide.SHORT, check_closed=False)
             if position_binance:
                 last_orders: Order = db_get_order_binance_position_id(position_binance.id)
                 order_binance = get_order_id(symbol, last_orders[0].binance_id)
@@ -289,10 +315,15 @@ class TradeMonitor:
         self.positions[symbol].short_break_even_price = Decimal(position.breakeven_price)
 
         save_position(position=self.positions[symbol], position_side=OrderPositionSide.SHORT, symbol=symbol,
-                            webhook_id=webhook_id, status=status)
+                      webhook_id=webhook_id, status=status)
         if status == PositionStatus.CLOSED:
-            self.positions[symbol] = SymbolPosition(short_qty=0, short_entry=0, short_break_even_price=0,
-                                                    short_adjusted_break_even_price=0)
+            self.positions[symbol] = SymbolPosition(
+                short_qty=0,
+                short_entry=0,
+                short_break_even_price=0,
+                short_adjusted_break_even_price=0,
+                webhook=None
+            )
 
     async def close_positions(self, symbol: str):
         position = self.positions.get(symbol)
@@ -301,7 +332,17 @@ class TradeMonitor:
             await close_positions(position, symbol, close_short=False)
         if position_short:
             await close_positions(position, symbol, close_long=False)
-        self.positions[symbol] = SymbolPosition()
+        self.positions[symbol] = SymbolPosition(
+            long_qty=0,
+            long_entry=0,
+            long_break_even_price=0,
+            long_adjusted_break_even_price=0,
+            short_qty=0,
+            short_entry=0,
+            short_break_even_price=0,
+            short_adjusted_break_even_price=0,
+            webhook=None
+        )
 
     async def check_closed_positions_status(self, symbol):
         position = self.positions.get(symbol)
@@ -362,7 +403,6 @@ async def start(symbols):
     await trade_monitor.start_monitor_events()
 
 
-
 import click
 
 
@@ -375,5 +415,3 @@ def main(symbol):
 
 if __name__ == '__main__':
     main()
-
-

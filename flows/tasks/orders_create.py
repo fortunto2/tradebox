@@ -7,9 +7,11 @@ from binance.error import ClientError
 from prefect import task
 from sqlalchemy.exc import IntegrityError
 
+from core.models.binance_position import PositionStatus
 from core.models.monitor import SymbolPosition
 from core.schemas.position import LongPosition, ShortPosition
-from core.views.handle_positions import get_exist_position
+from core.schemas.webhook import WebhookPayload
+from core.views.handle_positions import get_exist_position, save_position
 from flows.tasks.binance_futures import create_order_binance, check_position, cancel_order_binance, get_order_id
 from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide, OrderStatus, OrderBinanceStatus
 from core.views.handle_orders import db_get_all_order
@@ -25,7 +27,8 @@ def create_long_market_order(
         quantity: Decimal,
         leverage: int,
         webhook_id,
-        side: OrderSide = OrderSide.BUY
+        side: OrderSide = OrderSide.BUY,
+        payload: WebhookPayload = None
 ) -> Order:
     print("Market order LONG:")
 
@@ -65,6 +68,34 @@ def create_long_market_order(
             select_order.price = market_order.price
             select_order.binance_status = OrderBinanceStatus.FILLED
             session.commit()
+
+        # ----position open
+
+        position = SymbolPosition(
+            symbol=symbol,
+            long_qty=market_order.quantity,
+            long_entry=market_order.price,
+            long_break_even_price=position_long.breakEvenPrice,
+            long_pnl=0,
+            trailing_1=payload.settings.trail_1,
+            trailing_2=payload.settings.trail_2,
+            webhook_id=webhook_id,
+        )
+        position.calculate_pnl_long(market_order.price)
+        position.calculate_long_adjusted_break_even_price()
+
+        if side == OrderSide.BUY:
+            status = PositionStatus.OPEN
+        else:
+            status = PositionStatus.CLOSED
+
+        save_position(
+            position=position,
+            position_side=OrderPositionSide.LONG,
+            symbol=symbol,
+            webhook_id=webhook_id,
+            status=status
+        )
 
         return market_order
 
