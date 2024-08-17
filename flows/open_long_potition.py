@@ -32,7 +32,7 @@ async def open_long_position(payload: WebhookPayload, webhook_id, position_long:
             payload=payload
         )
 
-        tp_order = create_long_tp_order.submit(
+        tp_order = create_long_tp_order(
             symbol=payload.symbol,
             tp=payload.settings.tp,
             leverage=payload.open.leverage,

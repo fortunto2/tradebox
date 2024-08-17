@@ -86,7 +86,7 @@ async def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition, o
 
             elif order.type == OrderType.LONG_LIMIT:
                 logger.info(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
-                tp_order = create_long_tp_order.submit(
+                tp_order = create_long_tp_order(
                     symbol=payload.symbol,
                     tp=payload.settings.tp,
                     leverage=payload.open.leverage,
@@ -96,7 +96,7 @@ async def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition, o
                 filled_orders_in_db, grid_orders, grid = check_orders_in_the_grid(
                     payload, webhook_id)
                 if len(grid) > len(filled_orders_in_db):
-                    grid_make_long_limit_order.submit(
+                    grid_make_long_limit_order(
                         webhook_id=webhook_id,
                         payload=payload
                     )

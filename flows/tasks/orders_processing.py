@@ -39,7 +39,7 @@ def open_short_position_loop(
     quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
 
     # только один раз, когда хватает денег
-    short_market_order = create_short_market_stop_order.submit(
+    short_market_order = create_short_market_stop_order(
         symbol=payload.symbol,
         price=hedge_price,
         quantity=quantity,
@@ -139,7 +139,7 @@ def grid_make_long_limit_order(
         else:
             price, quantity = grid[len(filled_orders)]
 
-        limit_order = create_long_limit_order.submit(
+        limit_order = create_long_limit_order(
             symbol=payload.symbol,
             price=price,
             quantity=quantity,
@@ -153,7 +153,7 @@ def grid_make_long_limit_order(
 
             time.sleep(0.5)
 
-            create_short_market_stop_order.submit(
+            create_short_market_stop_order(
                 symbol=payload.symbol,
                 price=short_order_price,
                 quantity=short_order_amount,

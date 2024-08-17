@@ -67,6 +67,8 @@ class TradeMonitor:
 
         except BinanceAPIException as e:
             logger.error(f"Binance API error for symbol {symbol}: {e}")
+        except asyncio.CancelledError:
+            logger.warning("Symbol data stream monitoring was cancelled.")
         except Exception as e:
             logger.error(f"Error in monitor_symbol for {symbol}: {e}")
         finally:
@@ -83,6 +85,9 @@ class TradeMonitor:
 
         except BinanceAPIException as e:
             logger.error(f"Binance API error in user data stream: {e}")
+        except asyncio.CancelledError:
+            logger.warning("User data stream monitoring was cancelled.")
+
         except Exception as e:
             logger.error(f"Error in user data stream: {e}")
         finally:
@@ -121,13 +126,14 @@ class TradeMonitor:
 
     async def handle_agg_trade(self, event: AggregatedTradeEvent):
         position: SymbolPosition = self.positions.get(event.symbol)
-        if not position or position.long_qty == 0:
-            return None
+        # if not position or position.long_qty == 0:
+        #     return None
 
         current_price = Decimal(event.price)
         pnl_diff = self.calculate_pnl(position, current_price)
+        logger.warning(f"={event.symbol} PnL: {pnl_diff} USDT")
 
-        if pnl_diff > 0 and position.short_qty:
+        if pnl_diff + 1 > 0 and position.short_qty:
             logger.warning(f"={event.symbol} Profit: {pnl_diff} USDT")
             await self.close_positions(event.symbol)
             return None
@@ -326,12 +332,8 @@ class TradeMonitor:
             )
 
     async def close_positions(self, symbol: str):
-        position = self.positions.get(symbol)
-        position_long, position_short = check_position(symbol=symbol)
-        if position_long:
-            await close_positions(position, symbol, close_short=False)
-        if position_short:
-            await close_positions(position, symbol, close_long=False)
+        position = self.positions[symbol]
+        await close_positions(position, symbol)
         self.positions[symbol] = SymbolPosition(
             long_qty=0,
             long_entry=0,

@@ -21,7 +21,7 @@ sys.path.append('../../core')
 sys.path.append('')
 
 
-@task
+# @task
 def create_long_market_order(
         symbol: str,
         quantity: Decimal,
@@ -70,39 +70,39 @@ def create_long_market_order(
             session.commit()
 
         # ----position open
+        if payload:
+            position = SymbolPosition(
+                symbol=symbol,
+                long_qty=market_order.quantity,
+                long_entry=market_order.price,
+                long_break_even_price=position_long.breakEvenPrice,
+                long_pnl=0,
+                trailing_1=payload.settings.trail_1,
+                trailing_2=payload.settings.trail_2,
+                webhook_id=webhook_id,
+            )
+            position.calculate_pnl_long(market_order.price)
+            position.calculate_long_adjusted_break_even_price()
 
-        position = SymbolPosition(
-            symbol=symbol,
-            long_qty=market_order.quantity,
-            long_entry=market_order.price,
-            long_break_even_price=position_long.breakEvenPrice,
-            long_pnl=0,
-            trailing_1=payload.settings.trail_1,
-            trailing_2=payload.settings.trail_2,
-            webhook_id=webhook_id,
-        )
-        position.calculate_pnl_long(market_order.price)
-        position.calculate_long_adjusted_break_even_price()
+            if side == OrderSide.BUY:
+                status = PositionStatus.OPEN
+            else:
+                status = PositionStatus.CLOSED
 
-        if side == OrderSide.BUY:
-            status = PositionStatus.OPEN
-        else:
-            status = PositionStatus.CLOSED
-
-        save_position(
-            position=position,
-            position_side=OrderPositionSide.LONG,
-            symbol=symbol,
-            webhook_id=webhook_id,
-            status=status
-        )
+            save_position(
+                position=position,
+                position_side=OrderPositionSide.LONG,
+                symbol=symbol,
+                webhook_id=webhook_id,
+                status=status
+            )
 
         return market_order
 
     return execute_sqlmodel_query_single(create_order)
 
 
-@task
+# @task
 def create_short_market_order(
         symbol: str,
         quantity: Decimal,
@@ -229,7 +229,7 @@ def create_long_tp_order(
     return execute_sqlmodel_query_single(create_order)
 
 
-@task
+# @task
 def create_long_limit_order(
         symbol: str,
         price: Decimal,
@@ -271,7 +271,7 @@ def create_long_limit_order(
     return execute_sqlmodel_query_single(create_order)
 
 
-@task
+# @task
 def create_short_market_stop_order(
         symbol: str,
         price: Decimal,
@@ -311,7 +311,7 @@ def create_short_market_stop_order(
     return execute_sqlmodel_query_single(create_order)
 
 
-@task
+# @task
 def create_short_market_stop_loss_order(
         symbol: str,
         sl_short: float,
@@ -355,7 +355,7 @@ def create_short_market_stop_loss_order(
     return execute_sqlmodel_query_single(create_order)
 
 
-@task
+# @task
 def create_long_trailing_stop_order(
         symbol: str,
         leverage: int,

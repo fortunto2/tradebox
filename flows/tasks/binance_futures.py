@@ -216,7 +216,7 @@ def check_position_side_dual() -> bool:
 #     retries=3,
 #     retry_delay_seconds=5
 # )
-def check_position(symbol: str) -> ():
+def check_position(symbol: str) -> (LongPosition, ShortPosition):
     "GET /fapi/v2/positionRisk"
     """
     https://binance-docs.github.io/apidocs/futures/en/#position-information-v2-user_data
