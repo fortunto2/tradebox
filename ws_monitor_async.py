@@ -133,7 +133,7 @@ class TradeMonitor:
         pnl_diff = self.calculate_pnl(position, current_price)
         logger.warning(f"={event.symbol} PnL: {pnl_diff} USDT")
 
-        if pnl_diff + 1 > 0 and position.short_qty:
+        if pnl_diff > 0 and position.short_qty:
             logger.warning(f"={event.symbol} Profit: {pnl_diff} USDT")
             await self.close_positions(event.symbol)
             return None
