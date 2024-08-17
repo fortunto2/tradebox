@@ -31,13 +31,14 @@ async def close_positions(position: SymbolPosition, symbol: str, close_short=Tru
         position_long: LongPosition
         position_short: ShortPosition
 
-        if position_long.positionAmt > 0:
-            create_short_market_order(
+        # -- LONG ----------
+        if abs(position_long.positionAmt) > 0:
+            create_long_market_order(
                 symbol=symbol,
                 quantity=abs(position_long.positionAmt),
                 leverage=leverage,
                 webhook_id=position.webhook.id,
-                side=OrderSide.BUY
+                side=OrderSide.SELL
             )
             save_position(
                 position=position,
@@ -46,13 +47,15 @@ async def close_positions(position: SymbolPosition, symbol: str, close_short=Tru
                 webhook_id=position.webhook.id,
                 status=PositionStatus.CLOSED
             )
-        if abs(position_short.positionAmt) > 0:
-            create_long_market_order(
+
+        # -- Short----------
+        if position_short.positionAmt > 0:
+            create_short_market_order(
                 symbol=symbol,
                 quantity=abs(position_short.positionAmt),
                 leverage=leverage,
                 webhook_id=position.webhook.id,
-                side=OrderSide.SELL
+                side=OrderSide.BUY
             )
             save_position(
                 position=position,
