@@ -2,16 +2,14 @@ import logging
 from decimal import Decimal
 import sys
 from pprint import pprint
+from time import sleep
 
-from binance.error import ClientError
 from prefect import task
-from sqlalchemy.exc import IntegrityError
 
-from core.models.binance_position import PositionStatus
-from core.models.monitor import SymbolPosition
-from core.schemas.position import LongPosition, ShortPosition
+from core.models.binance_position import BinancePosition
+from core.schemas.position import LongPosition
 from core.schemas.webhook import WebhookPayload
-from core.views.handle_positions import get_exist_position, save_position
+from core.views.handle_positions import get_exist_position, open_position_task
 from flows.tasks.binance_futures import create_order_binance, check_position, cancel_order_binance, get_order_id
 from core.models.orders import Order, OrderPositionSide, OrderType, OrderSide, OrderStatus, OrderBinanceStatus
 from core.views.handle_orders import db_get_all_order
@@ -30,7 +28,7 @@ def create_long_market_order(
         side: OrderSide = OrderSide.BUY,
         payload: WebhookPayload = None
 ) -> Order:
-    print("Market order LONG:")
+    print("create_long_market_order:")
 
     def create_order(session):
         market_order = Order(
@@ -61,41 +59,34 @@ def create_long_market_order(
         select_order: Order = session.query(Order).filter(Order.binance_id == market_order.binance_id).first()
         if not select_order:
             session.add(market_order)
-            session.commit()
+
         else:
             logging.warning(f"Order already exists: {market_order.binance_id}")
             select_order.status = OrderStatus.FILLED
             select_order.price = market_order.price
             select_order.binance_status = OrderBinanceStatus.FILLED
-            session.commit()
+
+        # session.flush()
 
         # ----position open
         if payload:
-            position = SymbolPosition(
-                symbol=symbol,
-                long_qty=market_order.quantity,
-                long_entry=market_order.price,
-                long_break_even_price=position_long.breakEvenPrice,
-                long_pnl=0,
-                trailing_1=payload.settings.trail_1,
-                trailing_2=payload.settings.trail_2,
-                webhook_id=webhook_id,
-            )
-            position.calculate_pnl_long(market_order.price)
-            position.calculate_long_adjusted_break_even_price()
 
             if side == OrderSide.BUY:
-                status = PositionStatus.OPEN
-            else:
-                status = PositionStatus.CLOSED
+                sleep(0.5) #todo: идет гонка с вебсокетами, нужно позже выделить это в отдельный поток
+                position = open_position_task(
+                    symbol=symbol,
+                    webhook_id=webhook_id,
+                    position_side=OrderPositionSide.LONG,
+                    position_qty=market_order.quantity,
+                    entry_price=market_order.price,
+                    entry_break_price=position_long.breakEvenPrice,
+                    trailing_1=Decimal(payload.settings.trail_1),
+                )
 
-            save_position(
-                position=position,
-                position_side=OrderPositionSide.LONG,
-                symbol=symbol,
-                webhook_id=webhook_id,
-                status=status
-            )
+                market_order.binance_position = position
+
+        session.merge(market_order)
+        session.commit()
 
         return market_order
 
@@ -171,9 +162,9 @@ def create_long_tp_order(
         tp: Decimal,
         leverage: int,
         webhook_id,
-        position: SymbolPosition = None
+        position: BinancePosition = None
 ) -> Order:
-    print("Take profit order:")
+    print("create_long_tp_order:")
 
     def create_order(session):
         cancel_in_progress_orders(symbol, webhook_id, OrderType.LONG_TAKE_PROFIT)
@@ -185,8 +176,8 @@ def create_long_tp_order(
             long_entry = position_long.entryPrice
             long_qty = position_long.positionAmt
         else:
-            long_entry = position.long_adjusted_break_even_price
-            long_qty = position.long_qty
+            long_entry = position.calculate_adjusted_break_even_price()
+            long_qty = position.position_qty
 
         tp_price = Decimal(long_entry) * (1 + Decimal(tp) / 100)
 
@@ -204,17 +195,17 @@ def create_long_tp_order(
         take_profit_order.binance_id = create_order_binance(take_profit_order)
         take_profit_order.status = OrderStatus.IN_PROGRESS
 
-        binance_position = get_exist_position(
-            symbol=symbol,
-            webhook_id=webhook_id,
-            position_side=OrderPositionSide.LONG
-        )
-        if binance_position:
-            take_profit_order.binance_position = binance_position
-
         pprint(take_profit_order.model_dump())
         select_order: Order = session.query(Order).filter(Order.binance_id == take_profit_order.binance_id).first()
         if not select_order:
+            binance_position = get_exist_position(
+                symbol=symbol,
+                webhook_id=webhook_id,
+                position_side=OrderPositionSide.LONG
+            )
+            if binance_position:
+                take_profit_order.binance_position = binance_position
+
             session.add(take_profit_order)
             session.commit()
         else:
@@ -237,7 +228,7 @@ def create_long_limit_order(
         leverage: int,
         webhook_id
 ) -> Order:
-    print("LONG-BUY-LIMIT order:")
+    print("create_long_limit_order:")
 
     def create_order(session):
         limit_order = Order(
@@ -257,6 +248,15 @@ def create_long_limit_order(
 
         select_order: Order = session.query(Order).filter(Order.binance_id == limit_order.binance_id).first()
         if not select_order:
+
+            binance_position = get_exist_position(
+                symbol=symbol,
+                webhook_id=webhook_id,
+                position_side=OrderPositionSide.LONG
+            )
+            if binance_position:
+                limit_order.binance_position = binance_position
+
             session.add(limit_order)
             session.commit()
         else:
@@ -280,7 +280,7 @@ def create_short_market_stop_order(
         webhook_id
 ) -> Order:
     # open short position
-    print("Creating SHORT STOP order:")
+    print("create_short_market_stop_order:")
 
     def create_order(session):
         order = Order(
@@ -317,14 +317,14 @@ def create_short_market_stop_loss_order(
         sl_short: float,
         leverage: int,
         webhook_id,
-        position: SymbolPosition,
+        position_short: BinancePosition,
         price_original: Decimal = None,
 ) -> Order:
-    print("SHORT-BUY:")
+    print("create_short_market_stop_loss_order:")
 
     def create_order(session):
-        price_position = Decimal(position.short_entry) * (1 + Decimal(sl_short) / 100)
-        quantity = abs(position.short_qty)
+        price_position = Decimal(position_short.entry_price) * (1 + Decimal(sl_short) / 100)
+        quantity = abs(position_short.position_qty)
         print('price:', price_position)
         print('quantity:', quantity)
 
@@ -360,17 +360,18 @@ def create_long_trailing_stop_order(
         symbol: str,
         leverage: int,
         webhook_id,
-        position: SymbolPosition
+        position_long: BinancePosition,
+        trailing_2: Decimal
 ) -> Order:
-    print("Creating LONG TRAILING STOP order with custom parameters:")
+    print("create_long_trailing_stop_order:")
 
     def create_order(session):
         cancel_in_progress_orders(symbol, webhook_id, OrderType.LONG_TAKE_PROFIT)
         cancel_in_progress_orders(symbol, webhook_id, OrderType.LONG_TRAILING_STOP_MARKET)
 
         # Рассчитываем цену активации трейлинга с использованием long_adjusted_break_even_price
-        activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
-        trail_follow_price = Decimal(position.trailing_2 / 100)
+        activation_price = position_long.activation_price
+        trail_follow_price = Decimal(trailing_2 / 100)
 
         # Настройка параметров трейлинг-стоп ордера
         trailing_stop_order = Order(
@@ -378,12 +379,10 @@ def create_long_trailing_stop_order(
             side=OrderSide.SELL,
             type=OrderType.LONG_TRAILING_STOP_MARKET,  # Используем обновленный тип ордера
             symbol=symbol,
-            quantity=position.long_qty,
+            quantity=position_long.position_qty,
             leverage=leverage,
             webhook_id=webhook_id,
             price=activation_price,  # Цена активации трейлинга
-            # trail_amount=trail_follow_price,  # Процент следования за ценой #callbackRate
-            # trail_step=trail_step  # Шаг перемещения ордера
         )
 
         # Создание ордера на Binance

@@ -23,30 +23,34 @@ async def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
         logger.error(f"Position not found in DB - {event.symbol}")
         # return None
 
-    order: Order = db_get_order_binance_id(order_binance_id)
-    if order:
-        logger.error(f"Order already exists in DB - {order_binance_id}")
-        return None
-
     with SessionLocal() as session:
 
-        order: Order = Order(
-            position_side=event.position_side,
-            side=event.side,
-            type=order_type,
-            symbol=event.symbol,
-            price=event.original_price,
-            price_stop=event.stop_price,
-            quantity=event.original_quantity,
-            webhook_id=webhook.id,
-            leverage=webhook.open['leverage'],
-            status=OrderStatus.IN_PROGRESS,
-            binance_status=event.order_status,
-            binance_id=order_binance_id,
-            binance_position=binance_position
+        order: Order = db_get_order_binance_id(order_binance_id)
+        if order:
+            logger.warning(f"Order already exists in DB - {order_binance_id}")
+            order.binance_position = binance_position
+            order.webhook = webhook
 
-        )
+        else:
 
-        session.add(order)
+            order: Order = Order(
+                position_side=event.position_side,
+                side=event.side,
+                type=order_type,
+                symbol=event.symbol,
+                price=event.original_price,
+                price_stop=event.stop_price,
+                quantity=event.original_quantity,
+                webhook_id=webhook.id,
+                leverage=webhook.open['leverage'],
+                status=OrderStatus.IN_PROGRESS,
+                binance_status=event.order_status,
+                binance_id=order_binance_id,
+                binance_position=binance_position
+
+            )
+
+            session.add(order)
+
         session.commit()
 

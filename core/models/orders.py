@@ -78,6 +78,9 @@ class Order(BaseTable, table=True):
     binance_position_id: Optional[int] = Field(default=None, foreign_key="binanceposition.id", index=True)
     binance_position: "BinancePosition" = Relationship(back_populates="orders")
 
+    commission_asset: Optional[str] = None
+    commission: Optional[Decimal] = None
+
     # __table_args__ = (
     #     Index("idx_webhook_symbol", "webhook_id", "symbol", "status", unique=True),
     # )

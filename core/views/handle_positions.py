@@ -1,117 +1,120 @@
 from decimal import Decimal
 from datetime import datetime, timedelta
 
-from prefect import task
 from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
 
 from core.clients.db_sync import SessionLocal, execute_sqlmodel_query
 from core.models.binance_position import BinancePosition, PositionStatus
-from core.models.orders import Order, OrderStatus, OrderType, OrderPositionSide, OrderSide
-from core.models.monitor import SymbolPosition
+from core.models.binance_symbol import BinanceSymbol
+from core.models.orders import OrderPositionSide
+from core.views.handle_orders import get_webhook
 
 
 # @task #todo: почемуто считает ее ассинхронной
-def save_position(
-        position: SymbolPosition,
-        position_side: OrderPositionSide,
-        symbol: str,
-        webhook_id: int,
-        status: PositionStatus = PositionStatus.OPEN,
+def update_position_task(
+        position: BinancePosition
 ):
     with SessionLocal() as session:
 
-        position_exist = get_exist_position(
-            symbol=symbol,
-            webhook_id=webhook_id,
-            position_side=position_side
-        )
-
-        if position_side == OrderPositionSide.LONG:
-
-            if position_exist:
-                #     update existing position
-                position_exist.activation_price = position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100)
-                position_exist.status = status
-                position_exist.updated_at = datetime.utcnow()
-
-                if status == PositionStatus.CLOSED or position.long_qty == 0:
-                    position_exist.closed_at = datetime.utcnow()
-                    position_exist.pnl = position.long_pnl
-
-                elif status == PositionStatus.OPEN:
-                    position_exist.pnl = 0
-                else:
-                    position_exist.position_qty = position.long_qty
-                    position_exist.entry_price = position.long_entry
-                    position_exist.entry_break_price = position.long_break_even_price
-
-                position = position_exist
-
-            else:
-
-                position: BinancePosition = BinancePosition(
-                    symbol=symbol,
-                    position_side=OrderPositionSide.LONG,
-                    position_qty=position.long_qty,
-                    entry_price=position.long_entry,
-                    entry_break_price=position.long_break_even_price,
-                    pnl=position.long_pnl,
-                    webhook_id=webhook_id,
-                    status=status,
-                    activation_price=position.long_adjusted_break_even_price * (1 + position.trailing_1 / 100),
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
-                )
-
-        elif position_side == OrderPositionSide.SHORT:
-
-            if position_exist:
-                #     update existing position
-                position_exist.status = status
-                position_exist.updated_at = datetime.utcnow()
-                position_exist.activation_price = position.short_adjusted_break_even_price * (1 + position.trailing_1 / 100)
-
-                if status == PositionStatus.CLOSED or position.short_qty == 0:
-                    position_exist.closed_at = datetime.utcnow()
-                    position_exist.pnl = position.short_pnl
-                elif status == PositionStatus.OPEN:
-                    position_exist.pnl = 0
-                else:
-                    position_exist.position_qty = position.short_qty
-                    position_exist.entry_price = position.short_entry
-                    position_exist.entry_break_price = position.short_break_even_price
-
-                position = position_exist
-
-            else:
-
-                position: BinancePosition = BinancePosition(
-                    symbol=symbol,
-                    position_side=OrderPositionSide.SHORT,
-                    position_qty=position.short_qty,
-                    entry_price=position.short_entry,
-                    entry_break_price=position.short_break_even_price,
-                    pnl=position.short_pnl,
-                    webhook_id=webhook_id,
-                    activation_price=position.short_adjusted_break_even_price * (1 + position.trailing_1 / 100),
-                    status=status,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow()
-                )
+        trailing_1 = Decimal(position.webhook.settings.get('trail_1'))
+        activation_price = position.calculate_adjusted_break_even_price() * (1 + trailing_1 / 100)
+        position.activation_price = position.symbol_info.adjust_price(activation_price)
 
         session.merge(position)
         session.commit()
         return position
 
 
+def close_position_task(
+        position: BinancePosition,
+        pnl: Decimal = None,
+):
+    with SessionLocal() as session:
+
+        position.updated_at = datetime.utcnow()
+        position.closed_at = datetime.utcnow()
+        position.status = PositionStatus.CLOSED
+        if pnl:
+            # position.pnl = position.calculate_pnl()
+            position.pnl = pnl
+
+        session.merge(position)
+        session.commit()
+        return position
+
+
+# @task
+def open_position_task(
+        symbol: str,
+        position_qty: Decimal,
+        position_side: OrderPositionSide,
+        entry_price: Decimal,
+        entry_break_price: Decimal,
+        webhook_id: int = None,
+        activation_price: Decimal = None,
+        trailing_1: Decimal = None,
+):
+    with SessionLocal() as session:
+
+        position: BinancePosition = get_exist_position(
+            symbol=symbol,
+            position_side=position_side,
+        )
+
+        if position:
+            return position
+
+        symbol_info = session.query(BinanceSymbol).filter_by(symbol=symbol).first()
+
+        if not symbol_info:
+            raise ValueError(f"Symbol {symbol} not found in BinanceSymbol table.")
+
+        if not webhook_id:
+            webhook_id = get_webhook(symbol).id
+
+        position: BinancePosition = BinancePosition(
+            symbol=symbol,
+            symbol_info=symbol_info,
+            position_side=position_side,
+            position_qty=position_qty,
+            entry_price=entry_price,
+            entry_break_price=entry_break_price,
+            webhook_id=webhook_id,
+            activation_price=activation_price,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            status=PositionStatus.OPEN
+        )
+
+        session.flush()
+
+        if not trailing_1:
+            trailing_1 = Decimal(position.webhook.settings.get('trail_1'))
+
+        if not activation_price and trailing_1:
+            activation_price = position.calculate_adjusted_break_even_price() * (1 + trailing_1 / 100)
+            position.activation_price = position.symbol_info.adjust_price(activation_price)
+
+        session.merge(position)
+        session.commit()
+
+    return position
+
+
 def get_exist_position(symbol: str, webhook_id: int = None, position_side: OrderPositionSide = None, check_closed=True) -> BinancePosition:
     """
     Load all orders with status IN_PROGRESS from the database.
     """
+    if not webhook_id:
+        # защита, чтоб если позицию в базе не закрыли предыдущую, не брал не свой вебхук
+        webhook_id = get_webhook(symbol)
 
     def query_func(session):
-        query = select(BinancePosition).where(
+        query = select(BinancePosition).options(
+            joinedload(BinancePosition.webhook),
+            joinedload(BinancePosition.symbol_info)
+        ).where(
             BinancePosition.symbol == symbol
         ).order_by(BinancePosition.id.desc())
 
@@ -126,7 +129,6 @@ def get_exist_position(symbol: str, webhook_id: int = None, position_side: Order
         return result.first()
 
     return execute_sqlmodel_query(query_func)
-
 
 def delete_old_positions():
     with SessionLocal() as session:

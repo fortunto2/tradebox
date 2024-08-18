@@ -1,7 +1,7 @@
 from prefect import task, flow, tags
 from prefect.task_runners import ConcurrentTaskRunner
 from core.logger import logger
-from core.models.monitor import SymbolPosition
+from core.models.binance_position import BinancePosition
 from core.views.handle_positions import get_exist_position
 from flows.agg_trade_flow import close_positions
 from core.clients.db_sync import SessionLocal
@@ -26,7 +26,7 @@ def handle_order_update(event):
 
 
 @flow(task_runner=ConcurrentTaskRunner())
-async def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition, order_type: OrderType = None):
+async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = None):
     with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
         with SessionLocal() as session:
 
@@ -47,22 +47,27 @@ async def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition, o
             webhook = order.webhook
             webhook_id = order.webhook.id
 
-            if not order.binance_position_id:
-                binance_position = get_exist_position(
-                    event.symbol,
-                    webhook.id,
-                    OrderPositionSide(event.position_side),
-                    check_closed=False
-                )
-                if not binance_position:
-                    logger.error(f"Position not found in DB - {event.symbol}")
-                else:
-                    order.binance_position = binance_position
+            position = order.binance_position
+
+            # if not order.binance_position_id:
+            #     binance_position = get_exist_position(
+            #         event.symbol,
+            #         webhook.id,
+            #         OrderPositionSide(event.position_side),
+            #         check_closed=False
+            #     )
+            #     if not binance_position:
+            #         logger.error(f"Position not found in DB - {event.symbol}")
+            #     else:
+            #         order.binance_position = binance_position
 
             order.binance_id = order_binance_id
             order.status = OrderStatus.FILLED
             order.binance_status = event.order_status
             order.price = event.average_price
+
+            order.commission_asset = event.commission_asset
+            order.commission = event.commission
 
             session.merge(order)
             session.commit()
@@ -116,7 +121,7 @@ async def order_filled_flow(event: OrderTradeUpdate, position: SymbolPosition, o
                     sl_short=payload.settings.sl_short,
                     leverage=payload.open.leverage,
                     webhook_id=order.webhook_id,
-                    position=position,
+                    position_short=position,
                     price_original=event.original_price
                 )
                 logger.info(f"Create short_stop_loss_order: {short_stop_loss_order.id}")

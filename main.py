@@ -11,7 +11,7 @@ from core.clients.db_sync import SessionLocal, sync_engine
 from core.models.binance_position import BinancePosition
 from core.models.binance_symbol import BinanceSymbol
 # from core.clients.db_sync import sync_engine
-from flows.open_long_potition import open_long_position
+from flows.open_long_position import open_long_position
 
 sentry_sdk.init(
     dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
@@ -196,7 +196,7 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     # logging.info(f"Current price for {symbol}: {current_price}")
 
     # async to thread run
-    result = await open_long_position(body, webhook.id, position_long)
+    result = await open_long_position(body, webhook.id)
     if not result:
         return HTTPException(status_code=400, detail="Failed to open long position")
 

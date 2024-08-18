@@ -171,7 +171,10 @@ def db_set_order_status(order_binance_id, status: OrderStatus, binance_status: s
 def db_get_order_binance_id(order_binance_id) -> Order:
     def query_func(session):
         try:
-            query = select(Order).options(joinedload(Order.webhook)).where(Order.binance_id == order_binance_id)
+            query = select(Order).options(
+                joinedload(Order.webhook),
+                joinedload(Order.binance_position)
+            ).where(Order.binance_id == order_binance_id)
             result = session.exec(query)
             return result.first()
         except Exception as e:

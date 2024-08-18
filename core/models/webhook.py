@@ -21,6 +21,7 @@ class WebHook(SQLModel, table=True):
     status: str = 'new'
 
     orders: List["Order"] = Relationship(back_populates="webhook")
+    binance_positions: List["BinancePosition"] = Relationship(back_populates="webhook")
 
     def from_payload(self, payload):
         self.name = payload.name

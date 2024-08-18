@@ -5,7 +5,7 @@ sys.path.append('..')
 sys.path.append('.')
 
 from flows.order_cancel_flow import order_cancel_flow
-from flows.open_long_potition import open_long_position
+from flows.open_long_position import open_long_position
 from flows.order_filled_flow import order_filled_flow
 
 filled_depl = order_filled_flow.to_deployment(name='order_filled_flow')
