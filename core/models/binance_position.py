@@ -62,26 +62,34 @@ class BinancePosition(SQLModel, table=True):
         Для расчета, когда закрываем позицию.
         Для других случаев, если нужно, PnL брать из Binance.
         """
+        adjusted_break_even_price = self.entry_price + (self.entry_price * Decimal(0.1)) / 100
+
         if self.entry_break_price is not None and self.entry_price is not None:
             if self.position_side == OrderPositionSide.LONG:
                 # Логика для long позиции
-                percentage_difference = ((self.entry_break_price - self.entry_price) / self.entry_price) * 100
-                adjusted_percentage = percentage_difference * 2
-                adjusted_break_even_price = self.symbol_info.adjust_precision(
-                    self.entry_break_price + (self.entry_price * (adjusted_percentage / 100)),
-                    self.symbol_info.price_precision
-                )
+                if self.entry_break_price != self.entry_price:
+                    percentage_difference = ((self.entry_break_price - self.entry_price) / self.entry_price) * 100
+
+                    adjusted_percentage = percentage_difference * 2
+                    adjusted_break_even_price = self.symbol_info.adjust_precision(
+                        self.entry_break_price + (self.entry_price * (adjusted_percentage / 100)),
+                        self.symbol_info.price_precision
+                    )
+                    logger.info(
+                        f"LONG: {self.position_side.value} adjusted_percentage: {round(adjusted_percentage, 2)}%, new_break_even_price: {adjusted_break_even_price}")
+
             elif self.position_side == OrderPositionSide.SHORT:
                 # Логика для short позиции
-                percentage_difference = ((self.entry_price - self.entry_break_price) / self.entry_price) * 100
-                adjusted_percentage = percentage_difference * 2
-                adjusted_break_even_price = self.symbol_info.adjust_precision(
-                    self.entry_break_price - (self.entry_price * (adjusted_percentage / 100)),
-                    self.symbol_info.price_precision
-                )
+                if self.entry_break_price != self.entry_price:
+                    percentage_difference = ((self.entry_price - self.entry_break_price) / self.entry_price) * 100
+                    adjusted_percentage = percentage_difference * 2
+                    adjusted_break_even_price = self.symbol_info.adjust_precision(
+                        self.entry_break_price - (self.entry_price * (adjusted_percentage / 100)),
+                        self.symbol_info.price_precision
+                    )
 
-            logger.info(f"{self.position_side.value} adjusted_percentage: {round(adjusted_percentage, 2)}%, new_break_even_price: {adjusted_break_even_price}")
-            return adjusted_break_even_price
+                    logger.info(f"SHORT: {self.position_side.value} adjusted_percentage: {round(adjusted_percentage, 2)}%, new_break_even_price: {adjusted_break_even_price}")
+        return adjusted_break_even_price
 
     def calculate_pnl(self, current_price: Decimal) -> Decimal:
         # надо брать из event не реализованный пнл

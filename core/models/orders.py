@@ -65,7 +65,9 @@ class Order(BaseTable, table=True):
     webhook_id: Optional[int] = Field(default=None, foreign_key="webhook.id", index=True)
     webhook: "WebHook" = Relationship(back_populates="orders")
     binance_id: Optional[str] = Field(default=None, index=True, unique=True)
-    symbol: str = Field(default=None, index=True)
+    symbol: str = Field(default=None, foreign_key="binancesymbol.symbol", index=True)
+    symbol_info: "BinanceSymbol" = Relationship(back_populates="orders")
+
     side: OrderSide = OrderSide.BUY
     position_side: OrderPositionSide
     price: Optional[Decimal] = None
@@ -80,7 +82,6 @@ class Order(BaseTable, table=True):
 
     commission_asset: Optional[str] = None
     commission: Optional[Decimal] = None
-
     # __table_args__ = (
     #     Index("idx_webhook_symbol", "webhook_id", "symbol", "status", unique=True),
     # )

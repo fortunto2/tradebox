@@ -6,9 +6,9 @@ import json
 import sentry_sdk
 from binance import AsyncClient, BinanceSocketManager
 from binance.exceptions import BinanceAPIException
+from pydantic import BaseModel, Field
 
 from core.models.binance_position import PositionStatus, BinancePosition
-from core.models.monitor import SymbolPositionState
 from core.models.orders import OrderType, OrderPositionSide, Order
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.base import Position
@@ -31,6 +31,13 @@ sentry_sdk.init(
     profiles_sample_rate=1.0,
 )
 
+class SymbolPositionState(BaseModel):
+    """
+    Состояние различных переменных кешируем по символу для работы в вебсокетах без базы
+    """
+    long_trailing_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    short_trailing_price: Decimal = Field(default_factory=lambda: Decimal(0))
+
 
 class TradeMonitor:
     def __init__(self, client: AsyncClient, symbols: List[str]):
@@ -51,7 +58,7 @@ class TradeMonitor:
         :param symbol:
         :return:
         """
-        await self.initialize_positions(symbol)
+        await check_closed_positions_status(symbol)
 
         streams = [
             f'{symbol.lower()}@aggTrade',  # Stream для агрегированных торгов
@@ -75,25 +82,22 @@ class TradeMonitor:
 
     async def monitor_user_data(self):
 
-        try:
-            async with self.bsm.futures_user_socket() as user_stream:
-                while True:
-                    user_msg = await user_stream.recv()
-                    if user_msg:
-                        await self.on_message(user_msg)
+        # try:
+       async with self.bsm.futures_user_socket() as user_stream:
+            while True:
+                user_msg = await user_stream.recv()
+                if user_msg:
+                    await self.on_message(user_msg)
 
-        except BinanceAPIException as e:
-            logger.error(f"Binance API error in user data stream: {e}")
-        except asyncio.CancelledError:
-            logger.warning("User data stream monitoring was cancelled.")
-
-        except Exception as e:
-            logger.error(f"Error in user data stream: {e}")
-        finally:
-            await self.client.close_connection()
-
-    async def initialize_positions(self, symbol: str):
-        await check_closed_positions_status(symbol)
+        # except BinanceAPIException as e:
+        #     logger.error(f"Binance API error in user data stream: {e}")
+        # except asyncio.CancelledError:
+        #     logger.warning("User data stream monitoring was cancelled.")
+        #
+        # except Exception as e:
+        #     logger.error(f"Error in user data stream: {e}")
+        # finally:
+        #     await self.client.close_connection()
 
     async def on_message(self, msg):
         event_type = msg.get('e')
@@ -129,6 +133,7 @@ class TradeMonitor:
         :return:
         """
 
+        # todo: придумать чтоб каждый раз позицию из базы не дергал
         position_long: BinancePosition = get_exist_position(
             symbol=symbol,
             position_side=OrderPositionSide.LONG,
@@ -216,7 +221,7 @@ class TradeMonitor:
 
         position: BinancePosition = get_exist_position(
             symbol=symbol,
-            position_side=position_side,
+            position_side=position_side
         )
 
         if position_event.position_amount != 0 and not position:
@@ -232,11 +237,11 @@ class TradeMonitor:
         elif position_event.position_amount == 0:
             logger.warning(f"Close position in {symbol} with {position_event.position_amount} amount")
 
-            position.pnl = position_event.unrealized_pnl
+            # position.pnl = position_event.unrealized_pnl
 
             close_position_task(
                 position=position,
-                pnl=position_event.unrealized_pnl
+                pnl=position_event.accumulated_realized
             )
 
             self.state[symbol] = SymbolPositionState(

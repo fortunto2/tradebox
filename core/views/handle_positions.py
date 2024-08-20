@@ -8,7 +8,7 @@ from core.clients.db_sync import SessionLocal, execute_sqlmodel_query
 from core.models.binance_position import BinancePosition, PositionStatus
 from core.models.binance_symbol import BinanceSymbol
 from core.models.orders import OrderPositionSide
-from core.views.handle_orders import get_webhook
+from core.views.handle_orders import get_webhook_last
 
 
 # @task #todo: почемуто считает ее ассинхронной
@@ -70,8 +70,9 @@ def open_position_task(
         if not symbol_info:
             raise ValueError(f"Symbol {symbol} not found in BinanceSymbol table.")
 
+        webhook = get_webhook_last(symbol)
         if not webhook_id:
-            webhook_id = get_webhook(symbol).id
+            webhook_id = webhook.id
 
         position: BinancePosition = BinancePosition(
             symbol=symbol,
@@ -87,19 +88,23 @@ def open_position_task(
             status=PositionStatus.OPEN
         )
 
-        session.flush()
+        session.add(position)
+        session.commit()
 
         if not trailing_1:
-            trailing_1 = Decimal(position.webhook.settings.get('trail_1'))
+            if position.webhook:
+                trailing_1 = Decimal(position.webhook.settings.get('trail_1'))
+            elif webhook:
+                trailing_1 = Decimal(webhook.settings.get('trail_1'))
 
         if not activation_price and trailing_1:
             activation_price = position.calculate_adjusted_break_even_price() * (1 + trailing_1 / 100)
             position.activation_price = position.symbol_info.adjust_price(activation_price)
 
-        session.merge(position)
+        position_id = position.id
         session.commit()
 
-    return position
+    return position_id
 
 
 def get_exist_position(symbol: str, webhook_id: int = None, position_side: OrderPositionSide = None, check_closed=True) -> BinancePosition:
@@ -108,7 +113,11 @@ def get_exist_position(symbol: str, webhook_id: int = None, position_side: Order
     """
     if not webhook_id:
         # защита, чтоб если позицию в базе не закрыли предыдущую, не брал не свой вебхук
-        webhook_id = get_webhook(symbol)
+        webhook = get_webhook_last(symbol)
+        if webhook:
+            webhook_id = webhook.id
+        else:
+            return None
 
     def query_func(session):
         query = select(BinancePosition).options(
@@ -129,6 +138,7 @@ def get_exist_position(symbol: str, webhook_id: int = None, position_side: Order
         return result.first()
 
     return execute_sqlmodel_query(query_func)
+
 
 def delete_old_positions():
     with SessionLocal() as session:

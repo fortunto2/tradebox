@@ -6,12 +6,6 @@ from pydantic import BaseModel, Field
 from core.models.webhook import WebHook
 
 
-class SymbolPositionState(BaseModel):
-    """
-    Состояние различных переменных кешируем по символу для работы в вебсокетах без базы
-    """
-    long_trailing_price: Decimal = Field(default_factory=lambda: Decimal(0))
-    short_trailing_price: Decimal = Field(default_factory=lambda: Decimal(0))
 
 
 class TradeMonitorBase:

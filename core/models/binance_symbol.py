@@ -11,6 +11,7 @@ class BinanceSymbol(SQLModel, table=True):
     price_precision: int
 
     positions: List["BinancePosition"] = Relationship(back_populates="symbol_info")
+    orders: List["Order"] = Relationship(back_populates="symbol_info")
 
     def adjust_precision(self, value: Decimal, precision: int) -> Decimal:
         """Корректировка точности значения."""

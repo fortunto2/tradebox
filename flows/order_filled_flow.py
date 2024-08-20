@@ -1,11 +1,9 @@
 from prefect import task, flow, tags
 from prefect.task_runners import ConcurrentTaskRunner
 from core.logger import logger
-from core.models.binance_position import BinancePosition
-from core.views.handle_positions import get_exist_position
 from flows.agg_trade_flow import close_positions
 from core.clients.db_sync import SessionLocal
-from core.models.orders import OrderStatus, Order, OrderType, OrderPositionSide
+from core.models.orders import OrderStatus, Order, OrderType, OrderSide
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.schemas.webhook import WebhookPayload
 from core.views.handle_orders import db_get_order_binance_id
@@ -83,20 +81,32 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
 
             if order.type == OrderType.LONG_TAKE_PROFIT:
                 await close_positions(
-                    position=position,
                     symbol=event.symbol,
                     close_long=False,
                     close_short=True
+                )
+            elif order.type == OrderType.LONG_MARKET and order.side == OrderSide.BUY:
+                # только первый раз в начале вебхука создаем ордеры
+                tp_order = create_long_tp_order(
+                    symbol=event.symbol,
+                    tp=payload.settings.tp,
+                    leverage=payload.open.leverage,
+                    webhook_id=webhook_id,
+                )
+
+                # первый запуск создание пары ордеров лимитных по сетке
+                grid_make_long_limit_order(
+                    webhook_id=webhook_id,
+                    payload=payload,
                 )
 
             elif order.type == OrderType.LONG_LIMIT:
                 logger.info(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
                 tp_order = create_long_tp_order(
-                    symbol=payload.symbol,
+                    symbol=event.symbol,
                     tp=payload.settings.tp,
                     leverage=payload.open.leverage,
-                    webhook_id=webhook_id,
-                    position=position
+                    webhook_id=webhook_id
                 )
                 filled_orders_in_db, grid_orders, grid = check_orders_in_the_grid(
                     payload, webhook_id)

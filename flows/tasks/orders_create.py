@@ -5,6 +5,7 @@ from pprint import pprint
 from time import sleep
 
 from prefect import task
+from sqlalchemy.orm import joinedload
 
 from core.models.binance_position import BinancePosition
 from core.schemas.position import LongPosition
@@ -43,52 +44,17 @@ def create_long_market_order(
         )
 
         order_binance_id = create_order_binance(market_order)
-        market_order.binance_id = order_binance_id
+        if side == OrderSide.BUY:
+            market_order.binance_id = order_binance_id
+            market_order.binance_status = OrderBinanceStatus.NEW
 
-        position_long, _ = check_position(symbol=symbol)
-        position_long: LongPosition
+            try:
+                session.commit()
+            except Exception as e:
+                logging.error(f"Create order error: {e}")
+                return None
 
-        if position_long:
-            market_order.price = position_long.entryPrice
-            market_order.status = OrderStatus.FILLED
-
-        market_order.binance_status = OrderBinanceStatus.FILLED
-
-        pprint(market_order.model_dump())
-
-        select_order: Order = session.query(Order).filter(Order.binance_id == market_order.binance_id).first()
-        if not select_order:
-            session.add(market_order)
-
-        else:
-            logging.warning(f"Order already exists: {market_order.binance_id}")
-            select_order.status = OrderStatus.FILLED
-            select_order.price = market_order.price
-            select_order.binance_status = OrderBinanceStatus.FILLED
-
-        # session.flush()
-
-        # ----position open
-        if payload:
-
-            if side == OrderSide.BUY:
-                sleep(0.5) #todo: идет гонка с вебсокетами, нужно позже выделить это в отдельный поток
-                position = open_position_task(
-                    symbol=symbol,
-                    webhook_id=webhook_id,
-                    position_side=OrderPositionSide.LONG,
-                    position_qty=market_order.quantity,
-                    entry_price=market_order.price,
-                    entry_break_price=position_long.breakEvenPrice,
-                    trailing_1=Decimal(payload.settings.trail_1),
-                )
-
-                market_order.binance_position = position
-
-        session.merge(market_order)
-        session.commit()
-
-        return market_order
+            return market_order.id
 
     return execute_sqlmodel_query_single(create_order)
 
@@ -121,25 +87,17 @@ def create_short_market_order(
         )
 
         order_binance_id = create_order_binance(market_order)
-        market_order.binance_id = order_binance_id
+        if side == OrderSide.SELL:
+            market_order.binance_id = order_binance_id
+            market_order.binance_status = OrderBinanceStatus.NEW
 
-        if position_short:
-            market_order.price = position_short.entryPrice
-            market_order.status = OrderStatus.FILLED
+            try:
+                session.commit()
+            except Exception as e:
+                logging.error(f"Create order error: {e}")
+                return None
 
-        market_order.binance_status = OrderBinanceStatus.FILLED
-        select_order: Order = session.query(Order).filter(Order.binance_id == market_order.binance_id).first()
-        if not select_order:
-            session.add(market_order)
-            session.commit()
-        else:
-            logging.warning(f"Order already exists: {market_order.binance_id}")
-            select_order.status = OrderStatus.FILLED
-            select_order.price = market_order.price
-            select_order.binance_status = OrderBinanceStatus.FILLED
-            session.commit()
-
-        return market_order
+            return market_order.id
 
     return execute_sqlmodel_query_single(create_order)
 
@@ -176,6 +134,7 @@ def create_long_tp_order(
             long_entry = position_long.entryPrice
             long_qty = position_long.positionAmt
         else:
+            # todo: тут возможно надо всетак загружать из базы еще раз
             long_entry = position.calculate_adjusted_break_even_price()
             long_qty = position.position_qty
 
@@ -193,7 +152,7 @@ def create_long_tp_order(
         )
 
         take_profit_order.binance_id = create_order_binance(take_profit_order)
-        take_profit_order.status = OrderStatus.IN_PROGRESS
+        take_profit_order.status = OrderStatus.NEW
 
         pprint(take_profit_order.model_dump())
         select_order: Order = session.query(Order).filter(Order.binance_id == take_profit_order.binance_id).first()

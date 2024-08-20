@@ -34,8 +34,8 @@ def get_commission_rates(symbol):
     return maker_commission, taker_commission
 
 # передаем символ
-symbol = '1000PEPEUSDT'
-maker_commission, taker_commission = get_commission_rates(symbol)
-
-print(f"Maker Commission Rate: {maker_commission}%")  # для лимитных ордеров
-print(f"Taker Commission Rate: {taker_commission}%")  # для маркет ордеров
+# symbol = '1000PEPEUSDT'
+# maker_commission, taker_commission = get_commission_rates(symbol)
+#
+# print(f"Maker Commission Rate: {maker_commission}%")  # для лимитных ордеров
+# print(f"Taker Commission Rate: {taker_commission}%")  # для маркет ордеров

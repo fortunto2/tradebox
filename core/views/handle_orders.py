@@ -66,7 +66,7 @@ def load_in_progress_orders():
     return execute_sqlmodel_query(query_func)
 
 
-def get_webhook(webhook_id: str) -> WebHook:
+def get_webhook_by_id(webhook_id: int) -> WebHook:
     def query_func(session):
         query = select(WebHook).where(WebHook.id == webhook_id)
         result = session.exec(query)

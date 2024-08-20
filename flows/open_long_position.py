@@ -23,15 +23,15 @@ async def open_long_position(payload: WebhookPayload, webhook_id):
         )
 
 
-        tp_order = create_long_tp_order(
-            symbol=payload.symbol,
-            tp=payload.settings.tp,
-            leverage=payload.open.leverage,
-            webhook_id=webhook_id,
-        )
-
-        # первый запуск создание пары ордеров лимитных по сетке
-        grid_make_long_limit_order(
-            webhook_id=webhook_id,
-            payload=payload,
-        )
+        # tp_order = create_long_tp_order(
+        #     symbol=payload.symbol,
+        #     tp=payload.settings.tp,
+        #     leverage=payload.open.leverage,
+        #     webhook_id=webhook_id,
+        # )
+        #
+        # # первый запуск создание пары ордеров лимитных по сетке
+        # grid_make_long_limit_order(
+        #     webhook_id=webhook_id,
+        #     payload=payload,
+        # )
