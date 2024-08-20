@@ -47,9 +47,15 @@ class BinancePosition(SQLModel, table=True):
 
     closed_at: Optional[datetime] = Field(default=None)
 
-    __table_args__ = (
-        Index("ix_binanceposition_uniq", "webhook_id", "symbol", "status", "position_side", unique=True),
+    filled_orders: List[Order] = Relationship(
+        sa_relationship_kwargs={
+            "primaryjoin": "and_(Order.binance_position_id == BinancePosition.id, Order.status == 'FILLED')"
+        }
     )
+
+    # __table_args__ = (
+    #     Index("ix_binanceposition_uniq", "webhook_id", "symbol", "status", "position_side", unique=True),
+    # )
 
     # todo: при записи все цены округлять по precision инструмента
 

@@ -149,10 +149,10 @@ def db_get_order(order_id) -> Order:
     return execute_sqlmodel_query_single(query_func)
 
 
-# @task(
-#     name=f'set_order_status',
-#     task_run_name='set_{order_binance_id}_status_{status.value}'
-# )
+@task(
+    name=f'set_order_status',
+    task_run_name='set_{order_binance_id}_status_{status.value}'
+)
 def db_set_order_status(order_binance_id, status: OrderStatus, binance_status: str = None) -> Order:
     def query_func(session):
         query = select(Order).where(Order.binance_id == order_binance_id)

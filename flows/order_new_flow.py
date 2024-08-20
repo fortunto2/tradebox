@@ -28,7 +28,7 @@ async def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
             event.symbol,
             webhook.id,
             OrderPositionSide(event.position_side),
-            check_closed=False
+            not_closed=False
         )
 
         if not binance_position:

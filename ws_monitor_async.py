@@ -9,7 +9,7 @@ from binance.exceptions import BinanceAPIException
 from pydantic import BaseModel, Field
 
 from core.models.binance_position import PositionStatus, BinancePosition
-from core.models.orders import OrderType, OrderPositionSide, Order
+from core.models.orders import OrderType, OrderPositionSide, Order, OrderStatus
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.base import Position
 from core.schemas.events.order_trade_update import OrderTradeUpdate
@@ -82,22 +82,22 @@ class TradeMonitor:
 
     async def monitor_user_data(self):
 
-        # try:
-       async with self.bsm.futures_user_socket() as user_stream:
-            while True:
-                user_msg = await user_stream.recv()
-                if user_msg:
-                    await self.on_message(user_msg)
+        try:
+           async with self.bsm.futures_user_socket() as user_stream:
+                while True:
+                    user_msg = await user_stream.recv()
+                    if user_msg:
+                        await self.on_message(user_msg)
 
-        # except BinanceAPIException as e:
-        #     logger.error(f"Binance API error in user data stream: {e}")
-        # except asyncio.CancelledError:
-        #     logger.warning("User data stream monitoring was cancelled.")
-        #
-        # except Exception as e:
-        #     logger.error(f"Error in user data stream: {e}")
-        # finally:
-        #     await self.client.close_connection()
+        except BinanceAPIException as e:
+            logger.error(f"Binance API error in user data stream: {e}")
+        except asyncio.CancelledError:
+            logger.warning("User data stream monitoring was cancelled.")
+
+        except Exception as e:
+            logger.error(f"Error in user data stream: {e}")
+        finally:
+            await self.client.close_connection()
 
     async def on_message(self, msg):
         event_type = msg.get('e')
@@ -114,13 +114,13 @@ class TradeMonitor:
     async def handle_agg_trade(self, event: AggregatedTradeEvent):
 
         current_price = Decimal(event.price)
-        # todo: сделать на коммисия ордеров
-        # pnl_diff = self.calculate_pnl(position, current_price)
-        #
-        # if pnl_diff > 0 and position.short_qty:
-        #     logger.warning(f"={event.symbol} Profit: {pnl_diff} USDT")
-        #     await self.close_positions(event.symbol)
-        #     return None
+
+        pnl_diff = self.calculate_pnl(event.symbol, current_price)
+
+        if pnl_diff > 0:
+            logger.warning(f"={event.symbol} Profit: {pnl_diff} USDT")
+            await close_positions(event.symbol)
+            return None
 
         # Trailing logic (asynchronous)
         await self.handle_trailing_long(event.symbol, current_price)
@@ -221,7 +221,7 @@ class TradeMonitor:
 
         position: BinancePosition = get_exist_position(
             symbol=symbol,
-            position_side=position_side
+            position_side=position_side,
         )
 
         if position_event.position_amount != 0 and not position:
@@ -241,7 +241,9 @@ class TradeMonitor:
 
             close_position_task(
                 position=position,
-                pnl=position_event.accumulated_realized
+                pnl=position_event.accumulated_realized,
+                symbol=symbol,
+                position_side=position_side
             )
 
             self.state[symbol] = SymbolPositionState(
@@ -263,17 +265,43 @@ class TradeMonitor:
                 position=position
             )
 
-    def calculate_pnl(self, position: BinancePosition, current_price: Decimal):
-        long_pnl = 0
-        short_pnl = 0
+    def calculate_pnl(self, symbol: str, current_price: Decimal):
 
-        if position.position_side == OrderPositionSide.LONG:
-            long_pnl = position.calculate_pnl(current_price)
+        # todo вебхук бы сразу знать или айди позиции
+        position_short = get_exist_position(
+            symbol=symbol,
+            position_side=OrderPositionSide.SHORT,
+        )
 
-        if position.position_side == OrderPositionSide.SHORT:
-            short_pnl = position.calculate_pnl(current_price)
+        if position_short:
 
-        return round(long_pnl + short_pnl, 2)
+            position_long = get_exist_position(
+                symbol=symbol,
+                position_side=OrderPositionSide.LONG,
+            )
+
+            if not position_long:
+                return 0
+
+            commission_long = sum(
+                order.commission for order in position_long.orders if
+                order.status == OrderStatus.FILLED and order.commission
+            ) * 2
+
+            commission_short = sum(
+                order.commission for order in position_short.orders if
+                order.status == OrderStatus.FILLED and order.commission
+            ) * 2
+
+            if not position_long or not position_short:
+                return 0
+
+            long_pnl = (current_price - position_long.entry_price) * position_long.position_qty - commission_long
+            short_pnl = (position_short.entry_price - current_price) * position_short.position_qty - commission_short
+
+            return round(long_pnl + short_pnl, 2)
+
+        return 0
 
 
 async def start(symbols):

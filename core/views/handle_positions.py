@@ -1,6 +1,7 @@
 from decimal import Decimal
 from datetime import datetime, timedelta
 
+from prefect import task
 from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
 
@@ -29,8 +30,16 @@ def update_position_task(
 def close_position_task(
         position: BinancePosition,
         pnl: Decimal = None,
+        symbol: str = None,
+        position_side: OrderPositionSide = None
 ):
     with SessionLocal() as session:
+
+        if not position:
+            position: BinancePosition = get_exist_position(
+                symbol=symbol,
+                position_side=position_side
+            )
 
         position.updated_at = datetime.utcnow()
         position.closed_at = datetime.utcnow()
@@ -107,7 +116,7 @@ def open_position_task(
     return position_id
 
 
-def get_exist_position(symbol: str, webhook_id: int = None, position_side: OrderPositionSide = None, check_closed=True) -> BinancePosition:
+def get_exist_position(symbol: str, webhook_id: int = None, position_side: OrderPositionSide = None, not_closed=True, return_all=False) -> BinancePosition:
     """
     Load all orders with status IN_PROGRESS from the database.
     """
@@ -122,7 +131,8 @@ def get_exist_position(symbol: str, webhook_id: int = None, position_side: Order
     def query_func(session):
         query = select(BinancePosition).options(
             joinedload(BinancePosition.webhook),
-            joinedload(BinancePosition.symbol_info)
+            joinedload(BinancePosition.symbol_info),
+            joinedload(BinancePosition.orders)
         ).where(
             BinancePosition.symbol == symbol
         ).order_by(BinancePosition.id.desc())
@@ -131,10 +141,12 @@ def get_exist_position(symbol: str, webhook_id: int = None, position_side: Order
             query = query.where(BinancePosition.position_side == position_side)
         if webhook_id:
             query = query.where(BinancePosition.webhook_id == webhook_id)
-        if check_closed:
+        if not_closed:
             query = query.where(BinancePosition.status != PositionStatus.CLOSED)
 
         result = session.exec(query)
+        if return_all:
+            return result.all()
         return result.first()
 
     return execute_sqlmodel_query(query_func)

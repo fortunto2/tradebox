@@ -85,6 +85,8 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
                     close_long=False,
                     close_short=True
                 )
+            elif order.type == OrderType.SHORT_MARKET:
+                pass
             elif order.type == OrderType.LONG_MARKET and order.side == OrderSide.BUY:
                 # только первый раз в начале вебхука создаем ордеры
                 tp_order = create_long_tp_order(

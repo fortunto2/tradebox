@@ -44,17 +44,17 @@ def create_long_market_order(
         )
 
         order_binance_id = create_order_binance(market_order)
-        if side == OrderSide.BUY:
-            market_order.binance_id = order_binance_id
-            market_order.binance_status = OrderBinanceStatus.NEW
-
-            try:
-                session.commit()
-            except Exception as e:
-                logging.error(f"Create order error: {e}")
-                return None
-
-            return market_order.id
+        # if side == OrderSide.BUY:
+        #     market_order.binance_id = order_binance_id
+        #     market_order.binance_status = OrderBinanceStatus.NEW
+        #
+        #     try:
+        #         session.commit()
+        #     except Exception as e:
+        #         logging.error(f"Create order error: {e}")
+        #         return None
+        #
+        #     return market_order.id
 
     return execute_sqlmodel_query_single(create_order)
 
@@ -87,17 +87,17 @@ def create_short_market_order(
         )
 
         order_binance_id = create_order_binance(market_order)
-        if side == OrderSide.SELL:
-            market_order.binance_id = order_binance_id
-            market_order.binance_status = OrderBinanceStatus.NEW
-
-            try:
-                session.commit()
-            except Exception as e:
-                logging.error(f"Create order error: {e}")
-                return None
-
-            return market_order.id
+        # if side == OrderSide.SELL:
+        #     market_order.binance_id = order_binance_id
+        #     market_order.binance_status = OrderBinanceStatus.NEW
+        #
+        #     try:
+        #         session.commit()
+        #     except Exception as e:
+        #         logging.error(f"Create order error: {e}")
+        #         return None
+        #
+        #     return market_order.id
 
     return execute_sqlmodel_query_single(create_order)
 
@@ -152,7 +152,7 @@ def create_long_tp_order(
         )
 
         take_profit_order.binance_id = create_order_binance(take_profit_order)
-        take_profit_order.status = OrderStatus.NEW
+        take_profit_order.status = OrderStatus.IN_PROGRESS
 
         pprint(take_profit_order.model_dump())
         select_order: Order = session.query(Order).filter(Order.binance_id == take_profit_order.binance_id).first()
