@@ -17,8 +17,6 @@ async def open_long_position(payload: WebhookPayload, webhook_id):
         market_order = create_long_market_order(
             symbol=payload.symbol,
             quantity=payload.open.amount,
-            leverage=payload.open.leverage,
-            webhook_id=webhook_id,
             payload=payload
         )
 

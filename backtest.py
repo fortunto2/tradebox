@@ -4,6 +4,7 @@
 from config import settings
 from binance.client import Client
 import pandas as pd
+# import talib as ta
 
 # Создаем клиента Binance
 client = Client(
@@ -33,7 +34,7 @@ def get_historical_data(symbol: str, interval: str, start_str: str, limit=1000):
 
 
 # Получаем данные
-data = get_historical_data('BTCUSDT', Client.KLINE_INTERVAL_1HOUR, "1 AUG 2024")
+data = get_historical_data('BTCUSDT', Client.KLINE_INTERVAL_1HOUR, "1 JAN 2024")
 
 # Создаем стратегию
 # Создаем стратегию

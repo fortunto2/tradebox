@@ -1,8 +1,8 @@
-import asyncio
-from datetime import time, timedelta
-from functools import lru_cache, cache
-from time import sleep
-from typing import List
+
+from datetime import timedelta
+
+from time import sleep, time
+
 
 from binance.error import ClientError
 from binance.um_futures import UMFutures
@@ -13,8 +13,7 @@ from fastapi import HTTPException
 from prefect import task, tags
 from prefect.tasks import task_input_hash
 from sqlmodel import select
-from sqlmodel.ext.asyncio.session import AsyncSession
-from tqdm import tqdm
+
 
 from core.clients.db_sync import SessionLocal, execute_sqlmodel_query_single
 from core.models.binance_symbol import BinanceSymbol
@@ -30,6 +29,18 @@ client = UMFutures()
 # get server time
 print(client.time())
 client = UMFutures(key=settings.BINANCE_API_KEY, secret=settings.BINANCE_API_SECRET)
+
+import base64
+
+
+def encode_order_id(order_id):
+    encoded = base64.urlsafe_b64encode(order_id.encode()).decode()
+    return encoded
+
+
+def decode_order_id(encoded_id):
+    decoded = base64.urlsafe_b64decode(encoded_id.encode()).decode()
+    return decoded
 
 
 # Get account information
@@ -54,7 +65,6 @@ def adjust_precision(value, precision):
 
 
 def get_symbol_quantity_and_precisions(symbol):
-
     def query_func(session_local):
         query = select(BinanceSymbol).where(BinanceSymbol.symbol == symbol)
         result = session_local.exec(query)
@@ -124,13 +134,15 @@ def create_order_binance(order: Order, return_full_response=False, trail_follow_
         # todo: надо вынести в базу данные по точности числа quantity
         quantity, price = get_symbol_price_and_quantity_by_precisions(order.symbol, order.quantity, order.price)
 
+        hashed_order_id = f"{order.symbol}_{order.id}_{int(time())}"
+
         order_params = {
             "symbol": order.symbol,
             "type": order.type.value,
             "quantity": quantity,
             "positionSide": order.position_side.value,
             "side": order.side.value,
-            'newClientOrderId': order.id,
+            'newClientOrderId': hashed_order_id
         }
 
         if order.type == OrderType.LONG_MARKET or order.type == OrderType.SHORT_MARKET:
@@ -168,7 +180,6 @@ def create_order_binance(order: Order, return_full_response=False, trail_follow_
             return None
 
 
-
 # @task
 def cancel_order_binance(symbol, order_id):
     """
@@ -180,6 +191,19 @@ def cancel_order_binance(symbol, order_id):
     """
     response = client.cancel_order(symbol=symbol, orderId=order_id)
     logging.info(f"Order canceled successfully: {response}")
+    return response
+
+
+# @task
+def change_leverage(symbol: str, leverage: int):
+    """
+    Устанавливаем плече в начале вебхука
+    :param symbol:
+    :param leverage:
+    :return:
+    """
+    response = client.change_leverage(symbol=symbol, leverage=leverage)
+    logging.info(f"change_leverage: {response}")
     return response
 
 
@@ -257,7 +281,6 @@ def check_all_orders(symbol: str, orderId: int = None):
     else:
         logging.info(f"No orders found")
         return None
-
 
 
 # @task

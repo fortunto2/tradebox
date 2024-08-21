@@ -65,14 +65,17 @@ async def close_positions(symbol: str, close_short=True, close_long=True):
             position_long_open_in_db: BinancePosition = get_exist_position(
                 symbol=symbol,
                 position_side=OrderPositionSide.LONG,
+                not_closed=False
             )
+            if not position_long_open_in_db:
+                logger.warning(f"no long position in {symbol}")
+                return False
+
             leverage = position_long_open_in_db.webhook.open.get('leverage')
 
             create_long_market_order(
                 symbol=symbol,
                 quantity=abs(position_long.positionAmt),
-                leverage=leverage,
-                webhook_id=position_long_open_in_db.webhook.id,
                 side=OrderSide.SELL
             )
             close_position_task(
@@ -80,18 +83,21 @@ async def close_positions(symbol: str, close_short=True, close_long=True):
             )
 
         # -- Short----------
-        if position_short.positionAmt > 0 and close_short:
+        if abs(position_short.positionAmt) > 0 and close_short:
             position_short_open_in_db: BinancePosition = get_exist_position(
                 symbol=symbol,
                 position_side=OrderPositionSide.SHORT,
+                not_closed=False
             )
+            if not position_short_open_in_db:
+                logger.warning(f"no short position in {symbol}")
+                return False
+
             leverage = position_short_open_in_db.webhook.open.get('leverage')
 
             create_short_market_order(
                 symbol=symbol,
                 quantity=abs(position_short.positionAmt),
-                leverage=leverage,
-                webhook_id=position_short_open_in_db.webhook.id,
                 side=OrderSide.BUY
             )
             close_position_task(

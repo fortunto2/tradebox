@@ -1,3 +1,4 @@
+from binance.error import ClientError
 from fastapi import FastAPI, Depends
 import logging
 
@@ -24,7 +25,7 @@ sentry_sdk.init(
     profiles_sample_rate=1.0,
 )
 
-from flows.tasks.binance_futures import check_position_side_dual, check_position
+from flows.tasks.binance_futures import check_position_side_dual, check_position, change_leverage
 from core.models.orders import Order
 from core.schemas.position import LongPosition
 from core.models.webhook import WebHook
@@ -164,8 +165,12 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     if not body.positionSide:
         return HTTPException(status_code=400, detail="positionSide is required (short or long)")
 
-    # todo: check if position already exists in db
-    # если слишком быстро пришло много вебхуков на один символ, все отработают
+    try:
+        leverage_response = change_leverage(symbol=symbol, leverage=int(body.open.leverage))
+    except ClientError as e:
+        return HTTPException(status_code=400, detail=e.error_message)
+    except Exception as e:
+        return HTTPException(status_code=400, detail=f"Failed to change leverage")
 
     position_long, _ = check_position(symbol=symbol)
     position_long: LongPosition

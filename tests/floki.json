@@ -7,7 +7,7 @@
     "enabled": true,
     "amountType": "amount",
     "amount": "50",
-    "leverage": "25"
+    "leverage": "30"
   },
   "settings": {
     "start": 1,

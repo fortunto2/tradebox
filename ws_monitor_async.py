@@ -189,19 +189,19 @@ class TradeMonitor:
         elif event.order_type == 'LIMIT' and event.position_side == 'SHORT':
             our_order_type = OrderType.SHORT_LIMIT
 
+        logger.warning(f"Order: {event.order_status}, {event.order_type}")
+
         if event.order_status == 'FILLED':
             filled_order = await order_filled_flow(event=event, order_type=our_order_type)
             if not filled_order:
                 await order_new_flow(event, our_order_type)
         elif event.order_status == 'CANCELED':
-            logger.warning(f"Order Canceled: {event.order_status}, {event.order_type}")
             await order_cancel_flow(event)
         elif event.order_status == 'REJECTED':
-            logger.warning(f"Order Rejected: {event.order_status}, {event.order_type}")
+            pass
         elif event.order_status == 'EXPIRED':
-            logger.warning(f"Order Expired: {event.order_status}, {event.order_type}")
+            pass
         elif event.order_status == 'NEW':
-            logger.warning(f"Order New: {event.order_status}, {event.order_type}")
             if our_order_type:
                 await order_new_flow(event, our_order_type)
 
@@ -222,6 +222,7 @@ class TradeMonitor:
         position: BinancePosition = get_exist_position(
             symbol=symbol,
             position_side=position_side,
+            not_closed=False
         )
 
         if position_event.position_amount != 0 and not position:
@@ -239,6 +240,7 @@ class TradeMonitor:
 
             # position.pnl = position_event.unrealized_pnl
 
+            # уже закрываем во флоу close_positions
             close_position_task(
                 position=position,
                 pnl=position_event.accumulated_realized,
@@ -273,7 +275,7 @@ class TradeMonitor:
             position_side=OrderPositionSide.SHORT,
         )
 
-        if position_short:
+        if position_short and position_short.position_qty != 0:
 
             position_long = get_exist_position(
                 symbol=symbol,
@@ -299,7 +301,9 @@ class TradeMonitor:
             long_pnl = (current_price - position_long.entry_price) * position_long.position_qty - commission_long
             short_pnl = (position_short.entry_price - current_price) * position_short.position_qty - commission_short
 
-            return round(long_pnl + short_pnl, 2)
+            # Если есть шортовая позиция, закрываем по маркету только если она существует и PnL положительный
+            if position_short and position_short.position_qty > 0:
+                return round(long_pnl + short_pnl, 2)
 
         return 0
 

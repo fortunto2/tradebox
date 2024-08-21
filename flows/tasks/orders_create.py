@@ -24,8 +24,6 @@ sys.path.append('')
 def create_long_market_order(
         symbol: str,
         quantity: Decimal,
-        leverage: int,
-        webhook_id,
         side: OrderSide = OrderSide.BUY,
         payload: WebhookPayload = None
 ) -> Order:
@@ -38,8 +36,6 @@ def create_long_market_order(
             type=OrderType.LONG_MARKET,
             symbol=symbol,
             quantity=quantity,
-            leverage=leverage,
-            webhook_id=webhook_id,
             order_number=0
         )
 
@@ -63,8 +59,6 @@ def create_long_market_order(
 def create_short_market_order(
         symbol: str,
         quantity: Decimal,
-        leverage: int,
-        webhook_id,
         side: OrderSide = OrderSide.SELL
 ):
     def create_order(session):
@@ -81,8 +75,6 @@ def create_short_market_order(
             type=OrderType.SHORT_MARKET,
             symbol=symbol,
             quantity=quantity,
-            leverage=leverage,
-            webhook_id=webhook_id,
             order_number=0
         )
 
