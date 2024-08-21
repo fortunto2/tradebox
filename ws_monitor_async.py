@@ -238,12 +238,10 @@ class TradeMonitor:
         elif position_event.position_amount == 0:
             logger.warning(f"Close position in {symbol} with {position_event.position_amount} amount")
 
-            # position.pnl = position_event.unrealized_pnl
-
             # уже закрываем во флоу close_positions
             close_position_task(
                 position=position,
-                pnl=position_event.accumulated_realized,
+                pnl=position_event.unrealized_pnl,
                 symbol=symbol,
                 position_side=position_side
             )

@@ -203,7 +203,7 @@ def change_leverage(symbol: str, leverage: int):
     :return:
     """
     response = client.change_leverage(symbol=symbol, leverage=leverage)
-    logging.info(f"change_leverage: {response}")
+    logging.warning(f"change_leverage: {response}")
     return response
 
 
