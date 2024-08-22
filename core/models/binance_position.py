@@ -47,11 +47,12 @@ class BinancePosition(SQLModel, table=True):
 
     closed_at: Optional[datetime] = Field(default=None)
 
-    filled_orders: List[Order] = Relationship(
-        sa_relationship_kwargs={
-            "primaryjoin": "and_(Order.binance_position_id == BinancePosition.id, Order.status == 'FILLED')"
-        }
-    )
+    # filled_orders: List[Order] = Relationship(
+    #     sa_relationship_kwargs={
+    #         "primaryjoin": "and_(Order.binance_position_id == BinancePosition.id, Order.status == 'FILLED')",
+    #         "overlaps": "binance_position,orders"
+    #     }
+    # )
 
     # __table_args__ = (
     #     Index("ix_binanceposition_uniq", "webhook_id", "symbol", "status", "position_side", unique=True),
