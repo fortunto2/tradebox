@@ -142,7 +142,7 @@ def create_order_binance(order: Order, return_full_response=False, trail_follow_
             "quantity": quantity,
             "positionSide": order.position_side.value,
             "side": order.side.value,
-            'newClientOrderId': hashed_order_id
+            # 'newClientOrderId': hashed_order_id
         }
 
         if order.type == OrderType.LONG_MARKET or order.type == OrderType.SHORT_MARKET:
