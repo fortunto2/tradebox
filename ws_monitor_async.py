@@ -265,6 +265,8 @@ class TradeMonitor:
                 position=position
             )
 
+        await check_closed_positions_status(symbol=symbol)
+
     def calculate_pnl(self, symbol: str, current_price: Decimal):
 
         # todo вебхук бы сразу знать или айди позиции
