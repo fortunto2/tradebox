@@ -70,8 +70,8 @@ admin.add_view(BinanceSymbolAdmin)
 
 class BinancePositionAdmin(ModelView, model=BinancePosition):
     can_create = False
-    can_edit = False
-    can_delete = False
+    can_edit = True
+    can_delete = True
     column_list = [BinancePosition.id,
                    BinancePosition.webhook_id,
                    BinancePosition.symbol,
@@ -94,8 +94,8 @@ admin.add_view(BinancePositionAdmin)
 
 class OrdersAdmin(ModelView, model=Order):
     can_create = False
-    can_edit = False
-    can_delete = False
+    can_edit = True
+    can_delete = True
     column_list = [Order.id, Order.binance_id, Order.symbol, Order.webhook_id, Order.binance_position_id, Order.position_side, Order.side, Order.status, Order.type, Order.price, Order.created_at]
     column_searchable_list = [Order.symbol, Order.webhook_id, Order.binance_id]
     column_sortable_list = [Order.id, Order.symbol, Order.webhook_id, Order.position_side, Order.side, Order.status,
