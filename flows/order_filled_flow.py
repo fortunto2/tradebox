@@ -67,6 +67,7 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
             order.commission_asset = event.commission_asset
             order.commission = event.commission
 
+            session.merge(order)
             session.commit()
 
             payload = WebhookPayload(
