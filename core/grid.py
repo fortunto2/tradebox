@@ -2,7 +2,7 @@ import json
 from decimal import Decimal
 import sys
 
-from prefect import task
+# from prefect import task
 
 from core.models.orders import OrderType
 from core.views.handle_orders import db_get_last_order
@@ -13,7 +13,7 @@ sys.path.append('')
 from core.schemas.webhook import WebhookPayload
 
 
-def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal, fee_percentage: float = 0.2) -> dict:
+def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal) -> dict:
     """
     Calculates various order prices based on the provided webhook payload and initial price.
 
@@ -31,16 +31,20 @@ def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal, fee_p
     martingale_steps = payload.settings.mg_long
     deposit = payload.settings.deposit
     leverage = payload.open.leverage
+    calculate_entry_price_start = Decimal(payload.open.entry_price)
 
     # Расчет цены Take Profit ордера от открытия позиции
-    take_profit_order_price = Decimal(initial_price) * Decimal(1 + (take_profit_percentage + Decimal(fee_percentage)) / 100)
+    # take_profit_order_price = Decimal(initial_price) * Decimal(1 + (take_profit_percentage + Decimal(fee_percentage)) / 100)
+
+    take_profit_order_price = calculate_entry_price_start * Decimal(1 + take_profit_percentage / 100)
 
     # Проверка корректности данных для количества шагов в сетке и количества ордеров
     if len(grid_long_steps) != order_quantity:
         raise ValueError("Количество данных в сетке не соответствует количеству ордеров order_quantity.")
 
     # Расчет цен лимитных ордеров для усреднения на лонг
-    long_orders = [initial_price]
+    # long_orders = [initial_price]
+    long_orders = [calculate_entry_price_start]
     for step in grid_long_steps:
         next_price = Decimal(long_orders[-1]) * Decimal(1 - step / 100)
         long_orders.append(next_price)
