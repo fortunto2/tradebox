@@ -4,6 +4,8 @@ from prefect import task
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlmodel import select
+
+from core.logger import logger
 from core.models.orders import Order, OrderStatus, OrderType, OrderPositionSide, OrderSide
 from core.models.webhook import WebHook
 from core.schemas.webhook import WebhookPayload
@@ -151,12 +153,17 @@ def db_get_order(order_id) -> Order:
 
 @task(
     name=f'set_order_status',
-    task_run_name='set_{order_binance_id}_status_{status.value}'
+    task_run_name='set_{order_binance_id}_status_{status.value}',
+    retries=3,
+    retry_delay_seconds=5
 )
 def db_set_order_status(order_binance_id, status: OrderStatus, binance_status: str = None) -> Order:
     def query_func(session):
         query = select(Order).where(Order.binance_id == order_binance_id)
         order = session.exec(query).first()
+        if not order:
+            logger.warning(f"Order not found in DB - {order_binance_id}")
+            return None
         order.status = status
         if binance_status:
             order.binance_status = binance_status
