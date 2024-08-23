@@ -1,4 +1,5 @@
 import asyncio
+from asyncio import sleep
 from typing import List, Dict
 from decimal import Decimal
 import json
@@ -48,9 +49,16 @@ class TradeMonitor:
         self.state: Dict[str, SymbolPositionState] = {symbol: SymbolPositionState() for symbol in symbols}
 
     async def start_monitor_events(self):
-        tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
-        tasks.append(self.monitor_user_data())  # Добавляем задачу для мониторинга пользовательских данных
-        await asyncio.gather(*tasks)
+        while True:
+            try:
+                tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
+                tasks.append(self.monitor_user_data())  # Добавляем задачу для мониторинга пользовательских данных
+                await asyncio.gather(*tasks)
+            except Exception as e:
+                logger.error(f"Error in monitor events: {e}")
+            # finally:
+            #     logger.info("Reconnecting to the WebSocket in 1 seconds...")
+            #     await asyncio.sleep(1)
 
     async def monitor_symbol(self, symbol: str):
         """
@@ -64,7 +72,6 @@ class TradeMonitor:
             f'{symbol.lower()}@aggTrade',  # Stream для агрегированных торгов
         ]
         try:
-
             async with self.bsm.futures_multiplex_socket(streams) as stream:
                 while True:
                     msg = await stream.recv()
@@ -73,12 +80,12 @@ class TradeMonitor:
 
         except BinanceAPIException as e:
             logger.error(f"Binance API error for symbol {symbol}: {e}")
-        except asyncio.CancelledError:
-            logger.warning("Symbol data stream monitoring was cancelled.")
+        except asyncio.CancelledError as e:
+            logger.warning(f"Symbol data stream monitoring was cancelled: {e}")
         except Exception as e:
             logger.error(f"Error in monitor_symbol for {symbol}: {e}")
-        finally:
-            await self.client.close_connection()
+        # finally:
+        #     await self.client.close_connection()
 
     async def monitor_user_data(self):
 
@@ -91,13 +98,12 @@ class TradeMonitor:
 
         except BinanceAPIException as e:
             logger.error(f"Binance API error in user data stream: {e}")
-        except asyncio.CancelledError:
-            logger.warning("User data stream monitoring was cancelled.")
-
+        except asyncio.CancelledError as e:
+            logger.warning(f"User data stream monitoring was cancelled: {e}")
         except Exception as e:
             logger.error(f"Error in user data stream: {e}")
-        finally:
-            await self.client.close_connection()
+        # finally:
+        #     await self.client.close_connection()
 
     async def on_message(self, msg):
         event_type = msg.get('e')
@@ -145,18 +151,24 @@ class TradeMonitor:
         trailing_2 = Decimal(position_long.webhook.settings.get('trail_2', 0))
         trailing_step = Decimal(position_long.webhook.settings.get('trail_step', 0))
 
-        if current_price >= position_long.activation_price and self.state[symbol].long_trailing_price == 0:
-            self.state[symbol].long_trailing_price = position_long.activation_price * (1 - trailing_2 / 100)
-        else:
+        trailing_stop = position_long.activation_price * (1 - trailing_2 / 100)
+
+        if current_price >= position_long.activation_price and self.state[symbol].long_trailing_price == Decimal(0):
+            self.state[symbol].long_trailing_price = trailing_stop
+        elif self.state[symbol].long_trailing_price != Decimal(0):
 
             if current_price >= self.state[symbol].long_trailing_price + (self.state[symbol].long_trailing_price * Decimal(trailing_step) / 100):
 
-                new_long_trailing_price = current_price - (current_price * trailing_2 / 100)
+                new_long_trailing_stop = current_price - (current_price * trailing_2 / 100)
 
-                if new_long_trailing_price > self.state[symbol].long_trailing_price:
-                    self.state[symbol].long_trailing_price = new_long_trailing_price
+                if new_long_trailing_stop > self.state[symbol].long_trailing_price:
+                    old_price = self.state[symbol].long_trailing_price
+
+                    logger.warning(f"{symbol} percent diff: {round((new_long_trailing_stop - old_price) / old_price * 100, 2)}")
+
+                    self.state[symbol].long_trailing_price = new_long_trailing_stop
                     logger.warning(f"{symbol} Current price: {round(current_price, 8)}")
-                    logger.warning(f"{symbol} Trailing stop updated to: {round(new_long_trailing_price, 8)}")
+                    logger.warning(f"{symbol} Trailing stop updated to: {round(new_long_trailing_stop, 8)}")
 
                     await check_closed_positions_status(symbol=symbol)
 
@@ -166,6 +178,7 @@ class TradeMonitor:
             self.state[symbol] = SymbolPositionState(
                 long_trailing_price=0
             )
+            await sleep(3) # todo: позиция не успевает в базе закрыться, надо дать время, чтоб заново не начился трейлинг
 
     async def handle_order_update(self, event: OrderTradeUpdate):
         if event.symbol not in self.symbols:
