@@ -26,7 +26,7 @@ class WebHook(SQLModel, table=True):
 
     created_at: datetime = Field(
         default_factory=datetime.now,
-        nullable=False,
+        nullable=True,
     )
 
     def from_payload(self, payload):
