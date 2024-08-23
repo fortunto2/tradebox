@@ -251,16 +251,18 @@ class TradeMonitor:
 
             if order_id:
                 pnl = get_position_closed_pnl(
-                    symbol=symbol,
-                    order_id=order_id
+                    symbol=symbol
                 )
             else:
                 pnl = position_event.unrealized_pnl
 
+            comission = self.__calculate_comission(position.orders)
+            pnl -= comission
+
             # уже закрываем во флоу close_positions
             close_position_task(
                 position=position,
-                pnl=pnl,
+                pnl=round(pnl, 2),
                 symbol=symbol,
                 position_side=position_side
             )
@@ -286,6 +288,14 @@ class TradeMonitor:
 
         # await check_closed_positions_status(symbol=symbol)
 
+    def __calculate_comission(self, orders: List[Order]):
+        commission = sum(
+            order.commission for order in orders if
+            order.status == OrderStatus.FILLED and order.commission
+        ) * 2
+
+        return commission
+
     def calculate_pnl(self, symbol: str, current_price: Decimal):
 
         # todo вебхук бы сразу знать или айди позиции
@@ -304,15 +314,8 @@ class TradeMonitor:
             if not position_long:
                 return 0
 
-            commission_long = sum(
-                order.commission for order in position_long.orders if
-                order.status == OrderStatus.FILLED and order.commission
-            ) * 2
-
-            commission_short = sum(
-                order.commission for order in position_short.orders if
-                order.status == OrderStatus.FILLED and order.commission
-            ) * 2
+            commission_long = self.__calculate_comission(position_long.orders)
+            commission_short = self.__calculate_comission(position_short.orders)
 
             if not position_long or not position_short:
                 return 0

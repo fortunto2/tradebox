@@ -319,7 +319,7 @@ def cancel_open_orders(symbol: str) -> dict:
 
 
 # @task
-def get_position_closed_pnl(symbol: str, order_id: int) -> Decimal:
+def get_position_closed_pnl(symbol: str) -> Decimal:
     # orders = client.get_account_trades(symbol=symbol, orderId=order_id)
     orders = client.get_account_trades(symbol=symbol, limit=1)[::-1]
     return Decimal(orders[0].get('realizedPnl'))
