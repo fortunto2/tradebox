@@ -2,11 +2,9 @@ import asyncio
 from asyncio import sleep
 from typing import List, Dict
 from decimal import Decimal
-import json
 
 import sentry_sdk
 from binance import AsyncClient, BinanceSocketManager
-from binance.exceptions import BinanceAPIException
 from pydantic import BaseModel, Field
 
 from core.models.binance_position import PositionStatus, BinancePosition
@@ -52,18 +50,18 @@ class TradeMonitor:
 
     async def start_monitor_events(self):
         while True:
-            try:
-                tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
-                tasks.append(self.monitor_user_data())  # Добавляем задачу для мониторинга пользовательских данных
-                await asyncio.gather(*tasks)
-            except asyncio.CancelledError:
-                logger.warning("Task was cancelled!")
-            except Exception as e:
-                logger.error(f"Error in monitor events: {e}")
-            finally:
-                await self.client.close_connection()
-                logger.info("Reconnecting to the WebSocket in start_monitor_events...")
-            #     await asyncio.sleep(1)
+            # try:
+            tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
+            tasks.append(self.monitor_user_data())  # Добавляем задачу для мониторинга пользовательских данных
+            await asyncio.gather(*tasks)
+            # except asyncio.CancelledError:
+            #     logger.warning("Task was cancelled!")
+            # except Exception as e:
+            #     logger.error(f"Error in monitor events: {e}")
+            # finally:
+            #     await self.client.close_connection()
+            #     logger.info("Reconnecting to the WebSocket in start_monitor_events...")
+            # #     await asyncio.sleep(1)
 
     async def monitor_symbol(self, symbol: str):
         """
@@ -109,7 +107,7 @@ class TradeMonitor:
         pnl_diff = self.calculate_pnl(event.symbol, current_price)
 
         if pnl_diff > 0:
-            logger.warning(f"={event.symbol} Profit: {pnl_diff} USDT")
+            logger.warning(f">> Close positions {event.symbol} by PNL: {pnl_diff} USDT")
             await close_positions(event.symbol)
             return None
 
@@ -160,7 +158,8 @@ class TradeMonitor:
                     await check_closed_positions_status(symbol=symbol)
 
         if self.state[symbol].long_trailing_price and current_price <= self.state[symbol].long_trailing_price:
-            logger.warning(f"{symbol} Trailing stop triggered at: {round(current_price, 8)}")
+            logger.warning(f">> Close positions {symbol} by LONG trailing, stop price: {round(current_price, 8)} ")
+
             await close_positions(symbol)
             self.state[symbol] = SymbolPositionState(
                 long_trailing_price=0

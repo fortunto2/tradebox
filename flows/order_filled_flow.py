@@ -80,6 +80,7 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
             )
 
             if order.type == OrderType.LONG_TAKE_PROFIT:
+                logger.warning(f">> Close positions {event.symbol} by LONG_TAKE_PROFIT")
                 await close_positions(
                     symbol=event.symbol,
                     close_long=False,
