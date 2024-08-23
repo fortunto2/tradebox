@@ -88,6 +88,8 @@ class BinancePositionAdmin(ModelView, model=BinancePosition):
     column_searchable_list = [BinancePosition.symbol]
     # last is first
     column_default_sort = [(BinancePosition.id, True), (BinancePosition.created_at, False)]
+    details_template = "binance_position_with_orders.html"
+
 
 
 admin.add_view(BinancePositionAdmin)
