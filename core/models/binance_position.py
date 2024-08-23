@@ -54,9 +54,9 @@ class BinancePosition(SQLModel, table=True):
     #     }
     # )
 
-    # __table_args__ = (
-    #     Index("ix_binanceposition_uniq", "webhook_id", "symbol", "status", "position_side", unique=True),
-    # )
+    __table_args__ = (
+        Index("ix_binanceposition_uniq", "webhook_id", "symbol", "status", "position_side", unique=True),
+    )
 
     # todo: при записи все цены округлять по precision инструмента
 
