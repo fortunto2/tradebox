@@ -6,7 +6,7 @@ from core.models.orders import OrderStatus, Order, OrderType
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.views.handle_orders import db_set_order_status
 
-@flow
+# @flow
 async def order_cancel_flow(event: OrderTradeUpdate):
 
     # with SessionLocal() as session:
