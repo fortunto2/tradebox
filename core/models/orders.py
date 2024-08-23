@@ -84,5 +84,5 @@ class Order(BaseTable, table=True):
     commission: Optional[Decimal] = None
 
     __table_args__ = (
-        Index("idx_order_uniq_position", "binance_position_id", "type", "status", unique=True),
+        Index("idx_order_uniq_position", "binance_position_id", "type", "status", index=True),
     )
