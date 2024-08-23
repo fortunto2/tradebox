@@ -89,6 +89,8 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: always
+    environment:
+        - POSTGRESQL_MAX_CONNECTIONS=200
     env_file:
       - .env
     volumes:
@@ -110,6 +112,7 @@ services:
       - AUTH_TYPE=scram-sha-256 # remove/comment this line if using postgres:13 and lower
       - POOL_MODE=transaction
       - ADMIN_USERS=postgres,dbuser
+      - MAX_CLIENT_CONN=1000
     ports:
       - "5432:5432"
     depends_on:

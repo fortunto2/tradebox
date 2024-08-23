@@ -13,6 +13,7 @@ class OpenOrder(BaseModel):
     amountType: str
     amount: Decimal
     leverage: int
+    entry_price: Optional[float] = None
 
 
 class Settings(BaseModel):
