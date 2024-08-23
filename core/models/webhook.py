@@ -1,4 +1,5 @@
 import enum
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional, Literal, Dict, List
 
@@ -22,6 +23,11 @@ class WebHook(SQLModel, table=True):
 
     orders: List["Order"] = Relationship(back_populates="webhook")
     binance_positions: List["BinancePosition"] = Relationship(back_populates="webhook")
+
+    created_at: datetime = Field(
+        default_factory=datetime.now,
+        nullable=False,
+    )
 
     def from_payload(self, payload):
         self.name = payload.name
