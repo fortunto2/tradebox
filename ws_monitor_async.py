@@ -10,7 +10,7 @@ from binance.exceptions import BinanceAPIException
 from pydantic import BaseModel, Field
 
 from core.models.binance_position import PositionStatus, BinancePosition
-from core.models.orders import OrderType, OrderPositionSide, Order, OrderStatus
+from core.models.orders import OrderType, OrderPositionSide, Order, OrderStatus, OrderSide
 from core.schemas.events.agg_trade import AggregatedTradeEvent
 from core.schemas.events.base import Position
 from core.schemas.events.order_trade_update import OrderTradeUpdate
@@ -23,6 +23,7 @@ from core.logger import logger
 from flows.agg_trade_flow import close_positions, check_closed_positions_status
 from flows.order_filled_flow import order_filled_flow
 from flows.order_cancel_flow import order_cancel_flow
+from flows.tasks.binance_futures import get_position_closed_pnl
 
 settings = get_settings()
 
@@ -31,6 +32,7 @@ sentry_sdk.init(
     traces_sample_rate=1.0,
     profiles_sample_rate=1.0,
 )
+
 
 class SymbolPositionState(BaseModel):
     """
@@ -54,10 +56,13 @@ class TradeMonitor:
                 tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
                 tasks.append(self.monitor_user_data())  # Добавляем задачу для мониторинга пользовательских данных
                 await asyncio.gather(*tasks)
+            except asyncio.CancelledError:
+                logger.warning("Task was cancelled!")
             except Exception as e:
                 logger.error(f"Error in monitor events: {e}")
-            # finally:
-            #     logger.info("Reconnecting to the WebSocket in 1 seconds...")
+            finally:
+                await self.client.close_connection()
+                logger.info("Reconnecting to the WebSocket in start_monitor_events...")
             #     await asyncio.sleep(1)
 
     async def monitor_symbol(self, symbol: str):
@@ -79,7 +84,7 @@ class TradeMonitor:
 
     async def monitor_user_data(self):
 
-       async with self.bsm.futures_user_socket() as user_stream:
+        async with self.bsm.futures_user_socket() as user_stream:
             while True:
                 user_msg = await user_stream.recv()
                 if user_msg:
@@ -137,14 +142,16 @@ class TradeMonitor:
             self.state[symbol].long_trailing_price = trailing_stop
         elif self.state[symbol].long_trailing_price != Decimal(0):
 
-            if current_price >= self.state[symbol].long_trailing_price + (self.state[symbol].long_trailing_price * Decimal(trailing_step) / 100):
+            if current_price >= self.state[symbol].long_trailing_price + (
+                    self.state[symbol].long_trailing_price * Decimal(trailing_step) / 100):
 
                 new_long_trailing_stop = current_price - (current_price * trailing_2 / 100)
 
                 if new_long_trailing_stop > self.state[symbol].long_trailing_price:
                     old_price = self.state[symbol].long_trailing_price
 
-                    logger.warning(f"{symbol} percent diff: {round((new_long_trailing_stop - old_price) / old_price * 100, 2)}")
+                    logger.warning(
+                        f"{symbol} percent diff: {round((new_long_trailing_stop - old_price) / old_price * 100, 2)}")
 
                     self.state[symbol].long_trailing_price = new_long_trailing_stop
                     logger.warning(f"{symbol} Current price: {round(current_price, 8)}")
@@ -158,7 +165,8 @@ class TradeMonitor:
             self.state[symbol] = SymbolPositionState(
                 long_trailing_price=0
             )
-            await sleep(3) # todo: позиция не успевает в базе закрыться, надо дать время, чтоб заново не начился трейлинг
+            await sleep(
+                3)  # todo: позиция не успевает в базе закрыться, надо дать время, чтоб заново не начился трейлинг
 
     async def handle_order_update(self, event: OrderTradeUpdate):
         if event.symbol not in self.symbols:
@@ -232,10 +240,27 @@ class TradeMonitor:
         elif position_event.position_amount == 0:
             logger.warning(f"Close position in {symbol} with {position_event.position_amount} amount")
 
+            order_id = None
+
+            # filled last order sell, sort desc
+            for order in position.orders[::-1]:
+                # берем любой айдишник, щас маркет открытия позиции чтоб начать с него
+                if order.status == OrderStatus.FILLED and order.side == OrderSide.BUY:
+                    order_id = order.binance_id
+                    break
+
+            if order_id:
+                pnl = get_position_closed_pnl(
+                    symbol=symbol,
+                    order_id=order_id
+                )
+            else:
+                pnl = position_event.unrealized_pnl
+
             # уже закрываем во флоу close_positions
             close_position_task(
                 position=position,
-                pnl=position_event.unrealized_pnl,
+                pnl=pnl,
                 symbol=symbol,
                 position_side=position_side
             )
@@ -303,12 +328,24 @@ class TradeMonitor:
 
 
 async def start(symbols):
-    client = await AsyncClient.create(
-        api_key=settings.BINANCE_API_KEY,
-        api_secret=settings.BINANCE_API_SECRET
-    )
-    trade_monitor = TradeMonitor(client, symbols)
-    await trade_monitor.start_monitor_events()
+    while True:
+        client = None
+        try:
+            client = await AsyncClient.create(
+                api_key=settings.BINANCE_API_KEY,
+                api_secret=settings.BINANCE_API_SECRET
+            )
+            trade_monitor = TradeMonitor(client, symbols)
+            await trade_monitor.start_monitor_events()
+        except asyncio.CancelledError:
+            logger.warning("Task was cancelled. Restarting...")
+        except Exception as e:
+            logger.error(f"Error in start: {e}")
+        finally:
+            logger.info("Reconnecting to the WebSocket ...")
+            # await asyncio.sleep(10)
+            if client:
+                await client.close_connection()
 
 
 import click
