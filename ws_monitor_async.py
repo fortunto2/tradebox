@@ -145,8 +145,9 @@ class TradeMonitor:
         trailing_2 = Decimal(position_long.webhook.settings.get('trail_2', 0))
         trailing_step = Decimal(position_long.webhook.settings.get('trail_step', 0))
 
-        if current_price >= position_long.activation_price:
+        if current_price >= position_long.activation_price and self.state[symbol].long_trailing_price == 0:
             self.state[symbol].long_trailing_price = position_long.activation_price * (1 - trailing_2 / 100)
+        else:
 
             if current_price >= self.state[symbol].long_trailing_price + (self.state[symbol].long_trailing_price * Decimal(trailing_step) / 100):
 
@@ -265,7 +266,7 @@ class TradeMonitor:
                 position=position
             )
 
-        await check_closed_positions_status(symbol=symbol)
+        # await check_closed_positions_status(symbol=symbol)
 
     def calculate_pnl(self, symbol: str, current_price: Decimal):
 
