@@ -71,39 +71,19 @@ class TradeMonitor:
         streams = [
             f'{symbol.lower()}@aggTrade',  # Stream для агрегированных торгов
         ]
-        try:
-            async with self.bsm.futures_multiplex_socket(streams) as stream:
-                while True:
-                    msg = await stream.recv()
-                    if msg:
-                        await self.on_message(msg.get('data'))
-
-        except BinanceAPIException as e:
-            logger.error(f"Binance API error for symbol {symbol}: {e}")
-        except asyncio.CancelledError as e:
-            logger.warning(f"Symbol data stream monitoring was cancelled: {e}")
-        except Exception as e:
-            logger.error(f"Error in monitor_symbol for {symbol}: {e}")
-        # finally:
-        #     await self.client.close_connection()
+        async with self.bsm.futures_multiplex_socket(streams) as stream:
+            while True:
+                msg = await stream.recv()
+                if msg:
+                    await self.on_message(msg.get('data'))
 
     async def monitor_user_data(self):
 
-        try:
-           async with self.bsm.futures_user_socket() as user_stream:
-                while True:
-                    user_msg = await user_stream.recv()
-                    if user_msg:
-                        await self.on_message(user_msg)
-
-        except BinanceAPIException as e:
-            logger.error(f"Binance API error in user data stream: {e}")
-        except asyncio.CancelledError as e:
-            logger.warning(f"User data stream monitoring was cancelled: {e}")
-        except Exception as e:
-            logger.error(f"Error in user data stream: {e}")
-        # finally:
-        #     await self.client.close_connection()
+       async with self.bsm.futures_user_socket() as user_stream:
+            while True:
+                user_msg = await user_stream.recv()
+                if user_msg:
+                    await self.on_message(user_msg)
 
     async def on_message(self, msg):
         event_type = msg.get('e')
