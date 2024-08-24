@@ -1,6 +1,7 @@
 {% extends "sqladmin/layout.html" %}
 
 {% block content %}
+
 <div class="col-12">
   <div class="card">
     <div class="card-header">
@@ -75,6 +76,12 @@
           </tbody>
         </table>
       </div>
+
+
+      <!-- Chart Section -->
+      <h3 class="mt-4">Orders Chart</h3>
+      <canvas id="ordersChart" width="400" height="200"></canvas>
+
       <!-- End of Custom Section -->
 
       <div class="card-footer container">
@@ -133,5 +140,114 @@ url=model_view._url_for_action(request, custom_action) + '?pks=' + (get_object_i
 {% endwith %}
 {% endif %}
 {% endfor %}
+
+<!-- Interval Selection -->
+<div style="margin-top: 20px;">
+  <label for="interval-select">Select Interval:</label>
+  <select id="interval-select">
+<!--    <option value="1s">1 Seconds</option>-->
+    <option value="1m">1 Minute</option>
+    <option value="5m">5 Minutes</option>
+    <option value="15m">15 Minutes</option>
+    <option value="1h">1 Hour</option>
+    <option value="1d">1 Day</option>
+  </select>
+</div>
+
+<!-- Candlestick Chart with Custom Markers -->
+<div id="chart-container" style="width: 100%; height: 500px; position: relative; margin-top: 20px;"></div>
+
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+  function getCandlestickData(interval) {
+    // Fetch candlestick data based on the selected interval
+    var theUrl = "https://fapi.binance.com/fapi/v1/klines?symbol={{ model.symbol }}&interval=" + interval + "&limit=100";
+    var xmlHttp = new XMLHttpRequest();
+    xmlHttp.open("GET", theUrl, false); // false for synchronous request
+    xmlHttp.send(null);
+    var response = JSON.parse(xmlHttp.responseText);
+
+    var result = [];
+    for (var i = 0; i < response.length; i++) {
+      result.push({
+        time: response[i][0] / 1000,
+        open: parseFloat(response[i][1]),
+        high: parseFloat(response[i][2]),
+        low: parseFloat(response[i][3]),
+        close: parseFloat(response[i][4])
+      });
+    }
+    return result;
+  }
+
+  function renderChart(interval) {
+    const chartContainer = document.getElementById('chart-container');
+    chartContainer.innerHTML = ''; // Clear previous chart
+
+ const chart = LightweightCharts.createChart(chartContainer, {
+    layout: {
+      background: { color: '#161a1e' },
+      textColor: '#D9D9D9',
+    },
+    grid: {
+      vertLines: { color: '#2B2B43' },
+      horzLines: { color: '#363C4E' },
+    },
+    timeScale: {
+      timeVisible: true,   // Ensure time visibility is enabled
+      secondsVisible: true, // Show seconds if zoomed in enough
+      tickMarkFormatter: (time, tickMarkType, locale) => {
+        const date = new Date(time * 1000);
+        return `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}`;
+      }
+    },
+  });
+
+    const candleStickData = getCandlestickData(interval);
+    const candleSeries = chart.addCandlestickSeries();
+    candleSeries.setData(candleStickData);
+
+    // Add markers for each order
+    const orderMarkers = [
+      {% for order in model.orders %}
+      {
+        time: Math.floor(new Date("{{ order.created_at.isoformat() }}").getTime() / 1000),  // Corrected time conversion
+        position: '{{ "aboveBar" if order.side.value == "SELL" else "belowBar" }}',
+        color: '{{ "red" if order.side.value == "SELL" else "green" }}',
+        shape: '{{ "arrowDown" if order.side.value == "SELL" else "arrowUp" }}',
+        text: '{{ order.side.value }} at {{ order.price }}'
+      },
+      {% endfor %}
+    ];
+
+    candleSeries.setMarkers(orderMarkers);
+    console.log(orderMarkers)
+// Automatically zoom to the area where orders are located
+  if (orderMarkers.length > 0) {
+    const times = orderMarkers.map(marker => marker.time);
+    const minTime = Math.min(...times);
+    const maxTime = Math.max(...times);
+
+    chart.timeScale().setVisibleRange({
+      from: minTime,
+      to: maxTime
+    });
+  }
+
+  // Resize the chart on window resize
+  window.addEventListener("resize", () => {
+    chart.resize(window.innerWidth, 500);
+  });
+}
+
+// Initial render with default interval (1 minute) and automatic zoom
+renderChart('1m');
+
+// Update chart on interval selection change
+document.getElementById('interval-select').addEventListener('change', function () {
+  renderChart(this.value);
+});
+</script>
+
 
 {% endblock %}

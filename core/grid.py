@@ -97,16 +97,21 @@ def update_grid(
         webhook_id: int,
 ):
 
-    order_market = db_get_last_order(
-        webhook_id=webhook_id, order_type=OrderType.LONG_MARKET
-    )
+    # order_market = db_get_last_order(
+    #     webhook_id=webhook_id, order_type=OrderType.LONG_MARKET
+    # )
+    #
+    # if order_market is None:
+    #     raise ValueError("Не найден Market ордер.")
+    #
+    # order_market_price = order_market.price
 
-    if order_market is None:
-        raise ValueError("Не найден Market ордер.")
+    # Используем цену из payload для расчета сетки ордеров
+    calculate_entry_price_start = Decimal(payload.open.entry_price)
 
-    order_market_price = order_market.price
+    #grid_orders = calculate_grid_orders(payload, order_market_price)
 
-    grid_orders = calculate_grid_orders(payload, order_market_price)
+    grid_orders = calculate_grid_orders(payload, calculate_entry_price_start)
 
     if grid_orders["sufficient_funds"] is False:
         raise ValueError("Недостаточно средств для открытия позиции.")

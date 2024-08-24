@@ -109,6 +109,7 @@ class TradeMonitor:
         if pnl_diff > 0:
             logger.warning(f">> Close positions {event.symbol} by PNL: {pnl_diff} USDT")
             await close_positions(event.symbol)
+            await sleep(3)
             return None
 
         # Trailing logic (asynchronous)
@@ -164,8 +165,7 @@ class TradeMonitor:
             self.state[symbol] = SymbolPositionState(
                 long_trailing_price=0
             )
-            await sleep(
-                3)  # todo: позиция не успевает в базе закрыться, надо дать время, чтоб заново не начился трейлинг
+            await sleep(3)  # todo: позиция не успевает в базе закрыться, надо дать время, чтоб заново не начился трейлинг
 
     async def handle_order_update(self, event: OrderTradeUpdate):
         if event.symbol not in self.symbols:
@@ -345,7 +345,7 @@ async def start(symbols):
             logger.error(f"Error in start: {e}")
         finally:
             logger.info("Reconnecting to the WebSocket ...")
-            # await asyncio.sleep(10)
+            await asyncio.sleep(1)
             if client:
                 await client.close_connection()
 
