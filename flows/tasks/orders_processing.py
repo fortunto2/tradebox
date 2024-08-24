@@ -21,7 +21,7 @@ def open_short_position_loop(
         order_binance_id: str,
 ):
 
-    pnl = get_position_closed_pnl(payload.symbol, int(order_binance_id))
+    pnl = get_position_closed_pnl(payload.symbol)
     print("pnl:", pnl)
 
     extramarg = Decimal(payload.settings.extramarg) - abs(pnl)
