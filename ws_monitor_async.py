@@ -145,12 +145,13 @@ class TradeMonitor:
                     self.state[symbol].long_trailing_price * Decimal(trailing_step) / 100):
 
                 new_long_trailing_stop = current_price - (current_price * trailing_2 / 100)
+                old_price = self.state[symbol].long_trailing_price
+                percent_diff = (new_long_trailing_stop - old_price) / old_price * 100
 
-                if new_long_trailing_stop > self.state[symbol].long_trailing_price:
-                    old_price = self.state[symbol].long_trailing_price
+                if percent_diff > 0.1:
 
                     logger.warning(
-                        f"{symbol} percent diff: {round((new_long_trailing_stop - old_price) / old_price * 100, 2)}")
+                        f"{symbol} percent diff: {round(percent_diff, 2)}")
 
                     self.state[symbol].long_trailing_price = new_long_trailing_stop
                     logger.warning(f"{symbol} Current price: {round(current_price, 8)}")
