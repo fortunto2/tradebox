@@ -79,8 +79,8 @@ class TradeMonitor:
                 logger.error(traceback.format_exc())
             finally:
                 logger.info(f"Reconnecting to symbol stream for {symbol}...")
-                await asyncio.sleep(3)
-                await self.client.close_connection()
+                # await asyncio.sleep(3)
+                # await self.client.close_connection()
                 await check_closed_positions_status(symbol=symbol)
 
     async def monitor_user_data(self):
@@ -96,8 +96,9 @@ class TradeMonitor:
                 logger.error(traceback.format_exc())
             finally:
                 logger.info("Reconnecting to user data stream...")
-                await asyncio.sleep(3)
+                # await asyncio.sleep(3)
                 await self.client.close_connection()
+
 
     async def process_messages(self):
         while True:
