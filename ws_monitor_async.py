@@ -41,6 +41,7 @@ class SymbolPositionState(BaseModel):
     long_trailing_price: Decimal = Field(default_factory=lambda: Decimal(0))
     short_trailing_price: Decimal = Field(default_factory=lambda: Decimal(0))
     pnl_diff: Decimal = Field(default_factory=lambda: Decimal(0))
+    old_activation_price: Decimal = Field(default_factory=lambda: Decimal(0))
 
 
 class TradeMonitor:
@@ -68,7 +69,6 @@ class TradeMonitor:
             f'{symbol.lower()}@aggTrade',  # Stream для агрегированных торгов
         ]
         try:
-
             async with self.bsm.futures_multiplex_socket(streams) as stream:
                 while True:
                     msg = await stream.recv()
@@ -82,26 +82,28 @@ class TradeMonitor:
         except Exception as e:
             logger.error(f"Error in monitor_symbol for {symbol}: {e}")
         finally:
+            logger.info(f"Reconnecting to symbol stream for {symbol}...")
             await sleep(3)
             await self.client.close_connection()
 
     async def monitor_user_data(self):
 
-        # try:
-       async with self.bsm.futures_user_socket() as user_stream:
-            while True:
-                user_msg = await user_stream.recv()
-                if user_msg:
-                    await self.on_message(user_msg)
+        try:
+            async with self.bsm.futures_user_socket() as user_stream:
+                while True:
+                    user_msg = await user_stream.recv()
+                    if user_msg:
+                        await self.on_message(user_msg)
 
-        # except BinanceAPIException as e:
-        #     logger.error(f"Binance API error in user data stream: {e}")
-        # except asyncio.CancelledError:
-        #     logger.warning("User data stream monitoring was cancelled.")
-        # except Exception as e:
-        #     logger.error(f"Error in user data stream: {e}")
-        # finally:
-        #     await sleep(3)
+        except BinanceAPIException as e:
+            logger.error(f"Binance API error in user data stream: {e}")
+        except asyncio.CancelledError:
+            logger.warning("User data stream monitoring was cancelled.")
+        except Exception as e:
+            logger.error(f"Error in user data stream: {e}")
+        finally:
+            logger.info("Reconnecting to user data stream...")
+            await sleep(3)
             await self.client.close_connection()
 
     async def on_message(self, msg):
@@ -153,13 +155,13 @@ class TradeMonitor:
 
         trailing_2 = Decimal(position_long.webhook.settings.get('trail_2', 0))
         trailing_step = Decimal(position_long.webhook.settings.get('trail_step', 0))
-
         trailing_stop = position_long.activation_price * (1 - trailing_2 / 100)
 
         if current_price >= position_long.activation_price and self.state[symbol].long_trailing_price == Decimal(0):
             self.state[symbol].long_trailing_price = trailing_stop
-            logger.warning(f"{symbol} Trailing stop activated at: {round(trailing_stop, 8)}")
+            logger.warning(f"{symbol} -->TRAILING STOP ACTIVATED at: {round(trailing_stop, 8)}")
             cancel_tp_order(symbol=symbol, webhook_id=position_long.webhook_id)
+            logger.warning(f" -->Cancellation of TAKE PROFIT order: {symbol}")
         elif self.state[symbol].long_trailing_price != Decimal(0):
 
             if current_price >= self.state[symbol].long_trailing_price + (
@@ -169,21 +171,28 @@ class TradeMonitor:
                 old_price = self.state[symbol].long_trailing_price
                 percent_diff = (new_long_trailing_stop - old_price) / old_price * 100
 
-                if percent_diff > 0.1:
+                if percent_diff > 0.01:
 
                     logger.warning(
                         f"{symbol} percent diff: {round(percent_diff, 2)}")
 
                     self.state[symbol].long_trailing_price = new_long_trailing_stop
-                    logger.warning(f"{symbol} Current price: {round(current_price, 8)}")
-                    logger.warning(f"{symbol} Trailing stop updated to: {round(new_long_trailing_stop, 8)}")
+                    logger.warning(f"{symbol} -->Current price: {round(current_price, 8)}")
+                    logger.warning(f"{symbol} -->TRAILING STOP price updated to: {round(new_long_trailing_stop, 8)}")
 
                     await check_closed_positions_status(symbol=symbol)
         else:
-            logger.warning(f"{symbol} Trailing stop NOT ACTIVATED: {round(trailing_stop, 8)}")
+
+            if self.state[symbol].old_activation_price == 0:
+                self.state[symbol].old_activation_price = position_long.activation_price
+                logger.warning(
+                    f"{symbol} -->Waiting for TRAILING STOP activation at the price of: {round(position_long.activation_price, 8)}")
+            elif self.state[symbol].old_activation_price != 0 and self.state[symbol].old_activation_price != position_long.activation_price:
+                self.state[symbol].old_activation_price = position_long.activation_price
+                logger.warning(f"{symbol} -->Waiting for TRAILING STOP activation UPDATE price of: {round(position_long.activation_price, 8)}")
 
         if self.state[symbol].long_trailing_price and current_price <= self.state[symbol].long_trailing_price:
-            logger.warning(f">> Close positions {symbol} by LONG trailing, stop price: {round(current_price, 8)} ")
+            logger.warning(f"--> Close positions {symbol} by LONG trailing, stop price: {round(current_price, 8)} ")
 
             await close_positions(symbol)
             self.state[symbol] = SymbolPositionState(
@@ -353,7 +362,6 @@ class TradeMonitor:
 
 
 async def start(symbols):
-
     client = await AsyncClient.create(
         api_key=settings.BINANCE_API_KEY,
         api_secret=settings.BINANCE_API_SECRET

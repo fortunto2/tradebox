@@ -7,7 +7,7 @@ from time import sleep
 from prefect import task
 from sqlalchemy.orm import joinedload
 
-from core.logger import logger
+# from core.logger import logger
 from core.models.binance_position import BinancePosition
 from core.schemas.position import LongPosition
 from core.schemas.webhook import WebhookPayload
