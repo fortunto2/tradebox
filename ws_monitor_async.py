@@ -87,21 +87,21 @@ class TradeMonitor:
 
     async def monitor_user_data(self):
 
-        try:
-           async with self.bsm.futures_user_socket() as user_stream:
-                while True:
-                    user_msg = await user_stream.recv()
-                    if user_msg:
-                        await self.on_message(user_msg)
+        # try:
+       async with self.bsm.futures_user_socket() as user_stream:
+            while True:
+                user_msg = await user_stream.recv()
+                if user_msg:
+                    await self.on_message(user_msg)
 
-        except BinanceAPIException as e:
-            logger.error(f"Binance API error in user data stream: {e}")
-        except asyncio.CancelledError:
-            logger.warning("User data stream monitoring was cancelled.")
-        except Exception as e:
-            logger.error(f"Error in user data stream: {e}")
-        finally:
-            await sleep(3)
+        # except BinanceAPIException as e:
+        #     logger.error(f"Binance API error in user data stream: {e}")
+        # except asyncio.CancelledError:
+        #     logger.warning("User data stream monitoring was cancelled.")
+        # except Exception as e:
+        #     logger.error(f"Error in user data stream: {e}")
+        # finally:
+        #     await sleep(3)
             await self.client.close_connection()
 
     async def on_message(self, msg):
