@@ -119,7 +119,7 @@ def get_symbol_price_and_quantity_by_precisions(symbol, quantity, price=None):
     name=f'create_order_binance',
     task_run_name='create_order_{order.side.value}_{order.type.value}'
 )
-def create_order_binance(order: Order, return_full_response=False, trail_follow_price=None):
+async def create_order_binance(order: Order, return_full_response=False, trail_follow_price=None):
     """
     https://binance-docs.github.io/apidocs/futures/en/#new-order-trade
 

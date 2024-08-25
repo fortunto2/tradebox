@@ -157,8 +157,8 @@ def db_get_order(order_id) -> Order:
     retries=3,
     retry_delay_seconds=5
 )
-def db_set_order_status(order_binance_id, status: OrderStatus, binance_status: str = None) -> Order:
-    def query_func(session):
+async def db_set_order_status(order_binance_id, status: OrderStatus, binance_status: str = None) -> Order:
+    async def query_func(session):
         stmt = update(Order).where(Order.binance_id == order_binance_id).values(status=status)
         if binance_status:
             stmt = stmt.values(binance_status=binance_status)
@@ -167,7 +167,7 @@ def db_set_order_status(order_binance_id, status: OrderStatus, binance_status: s
         session.commit()
         return result.rowcount > 0
 
-    return execute_sqlmodel_query_single(query_func)
+    return await execute_sqlmodel_query_single(query_func)
 
 
 # @task

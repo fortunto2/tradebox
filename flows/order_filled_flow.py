@@ -91,7 +91,7 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
                 pass
             elif order.type == OrderType.LONG_MARKET and order.side == OrderSide.BUY:
                 # только первый раз в начале вебхука создаем ордеры
-                tp_order = create_long_tp_order(
+                tp_order = await create_long_tp_order.submit(
                     symbol=event.symbol,
                     tp=payload.settings.tp,
                     leverage=payload.open.leverage,
@@ -99,23 +99,23 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
                 )
 
                 # первый запуск создание пары ордеров лимитных по сетке
-                grid_make_long_limit_order(
+                await grid_make_long_limit_order.submit(
                     webhook_id=webhook_id,
                     payload=payload,
                 )
 
             elif order.type == OrderType.LONG_LIMIT:
                 logger.info(f"Order {order_binance_id} LIMIT start grid_make_limit_and_tp_order")
-                tp_order = create_long_tp_order(
+                tp_order = await create_long_tp_order.submit(
                     symbol=event.symbol,
                     tp=payload.settings.tp,
                     leverage=payload.open.leverage,
                     webhook_id=webhook_id
                 )
-                filled_orders_in_db, grid_orders, grid = check_orders_in_the_grid(
+                filled_orders_in_db, grid_orders, grid = await check_orders_in_the_grid(
                     payload, webhook_id)
                 if len(grid) > len(filled_orders_in_db):
-                    grid_make_long_limit_order(
+                    await grid_make_long_limit_order.submit(
                         webhook_id=webhook_id,
                         payload=payload
                     )
@@ -124,13 +124,13 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
 
             elif order.type == OrderType.SHORT_MARKET_STOP_LOSS:
                 logger.info(f"Order {order_binance_id} SHORT_MARKET_STOP_LOSS start make_hedge_by_pnl")
-                open_short_position_loop(
+                await open_short_position_loop(
                     payload=payload,
                     webhook_id=order.webhook_id,
                     order_binance_id=order_binance_id,
                 )
             elif order.type in {OrderType.SHORT_LIMIT, OrderType.SHORT_MARKET_STOP_OPEN}:
-                short_stop_loss_order = create_short_market_stop_loss_order(
+                short_stop_loss_order = await create_short_market_stop_loss_order(
                     symbol=payload.symbol,
                     sl_short=payload.settings.sl_short,
                     leverage=payload.open.leverage,

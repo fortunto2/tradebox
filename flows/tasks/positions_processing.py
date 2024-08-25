@@ -49,7 +49,7 @@ async def check_closed_positions_status(symbol):
 
 
 @task
-def open_short_position_loop(
+async def open_short_position_loop(
         payload: WebhookPayload,
         webhook_id,
         order_binance_id: str,
@@ -73,7 +73,7 @@ def open_short_position_loop(
     quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
 
     # только один раз, когда хватает денег
-    short_market_order = create_short_market_stop_order(
+    short_market_order = await create_short_market_stop_order(
         symbol=payload.symbol,
         price=hedge_price,
         quantity=quantity,

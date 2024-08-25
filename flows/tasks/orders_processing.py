@@ -13,7 +13,7 @@ from flows.tasks.orders_create import create_long_limit_order, \
 from core.clients.db_sync import execute_sqlmodel_query
 
 
-def get_grid_orders(
+async def get_grid_orders(
         symbol: str,
         status: OrderStatus = OrderStatus.FILLED,
         webhook_id=None,
@@ -31,7 +31,7 @@ def get_grid_orders(
     :return:
     """
 
-    def get_orders(session):
+    async def get_orders(session):
         if webhook_id:
             orders = db_get_orders(
                 webhook_id=webhook_id,
@@ -49,22 +49,22 @@ def get_grid_orders(
             )
         return orders
 
-    return execute_sqlmodel_query(get_orders)
+    return await execute_sqlmodel_query(get_orders)
 
 
-# @task(
-#     retries=3,
-#     retry_delay_seconds=1,
-#
-# )
-def check_orders_in_the_grid(payload: WebhookPayload, webhook_id):
-    def check_orders(session):
+@task(
+    retries=3,
+    retry_delay_seconds=1,
+
+)
+async def check_orders_in_the_grid(payload: WebhookPayload, webhook_id):
+    async def check_orders(session):
         grid_orders = update_grid(payload, webhook_id)
 
         grid = list(zip(grid_orders["long_orders"], grid_orders["martingale_orders"]))
         print(f"grid_orders: {len(grid)}")
 
-        filled_orders = get_grid_orders(
+        filled_orders = await get_grid_orders(
             symbol=payload.symbol,
             status=OrderStatus.FILLED,
             webhook_id=webhook_id,
@@ -74,11 +74,11 @@ def check_orders_in_the_grid(payload: WebhookPayload, webhook_id):
 
         return filled_orders, grid_orders, grid
 
-    return execute_sqlmodel_query(check_orders)
+    return await execute_sqlmodel_query(check_orders)
 
 
 @task
-def grid_make_long_limit_order(
+async def grid_make_long_limit_order(
         webhook_id,
         payload: WebhookPayload):
     """
@@ -87,21 +87,21 @@ def grid_make_long_limit_order(
     :return: Вернет True если есть еще ордера в сетке, False если последний ордер
     """
 
-    def create_limit_order(session):
+    async def create_limit_order(session):
         if not payload:
             print("payload not found, webhook_id:", webhook_id)
             return False
 
         time.sleep(0.5)
 
-        filled_orders, _, grid = check_orders_in_the_grid(payload, webhook_id)
+        filled_orders, _, grid = await check_orders_in_the_grid(payload, webhook_id)
 
         if len(grid) == 1:
             price, quantity = grid[len(filled_orders) - 1]
         else:
             price, quantity = grid[len(filled_orders)]
 
-        limit_order = create_long_limit_order(
+        limit_order = await create_long_limit_order(
             symbol=payload.symbol,
             price=price,
             quantity=quantity,
@@ -113,9 +113,9 @@ def grid_make_long_limit_order(
             short_order_price = Decimal(price) * Decimal(1 - payload.settings.offset_short / 100)
             short_order_amount = Decimal(payload.settings.extramarg * payload.open.leverage) / short_order_price
 
-            time.sleep(0.5)
+            time.sleep(0.5) #todo: нафига она тут
 
-            create_short_market_stop_order(
+            await create_short_market_stop_order(
                 symbol=payload.symbol,
                 price=short_order_price,
                 quantity=short_order_amount,
@@ -127,7 +127,7 @@ def grid_make_long_limit_order(
 
         return True
 
-    return execute_sqlmodel_query(create_limit_order)
+    return await execute_sqlmodel_query(create_limit_order)
 
 
 def main():

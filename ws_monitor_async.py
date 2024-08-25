@@ -1,6 +1,6 @@
 import asyncio
 import traceback
-from asyncio import sleep
+from asyncio import sleep, Queue
 from typing import List, Dict
 from decimal import Decimal
 
@@ -56,62 +56,54 @@ class TradeMonitor:
 
         self.symbols = symbols
         self.state: Dict[str, SymbolPositionState] = {symbol: SymbolPositionState() for symbol in symbols}
+        self.message_queue = Queue()
 
     async def start_monitor_events(self):
         tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
         tasks.append(self.monitor_user_data())  # Добавляем задачу для мониторинга пользовательских данных
+        tasks.append(self.process_messages())
         await asyncio.gather(*tasks)
 
     async def monitor_symbol(self, symbol: str):
-        """
-        https://developers.binance.com/docs/binance-spot-api-docs/web-socket-streams
-        :param symbol:
-        :return:
-        """
         await check_closed_positions_status(symbol)
-
-        streams = [
-            f'{symbol.lower()}@aggTrade',  # Stream для агрегированных торгов
-        ]
-        try:
-            async with self.bsm.futures_multiplex_socket(streams) as stream:
-                while True:
-                    msg = await stream.recv()
-                    if msg:
-                        await self.on_message(msg.get('data'))
-
-        except BinanceAPIException as e:
-            logger.error(f"Binance API error for symbol {symbol}: {e}")
-        except asyncio.CancelledError:
-            logger.warning("Symbol data stream monitoring was cancelled.")
-        except Exception as e:
-            logger.error(f"Error in monitor_symbol for {symbol}: {e}")
-            logger.error(traceback.format_exc())
-        finally:
-            logger.info(f"Reconnecting to symbol stream for {symbol}...")
-            await sleep(3)
-            await self.client.close_connection()
+        streams = [f'{symbol.lower()}@aggTrade']
+        while True:
+            try:
+                async with self.bsm.futures_multiplex_socket(streams) as stream:
+                    while True:
+                        msg = await stream.recv()
+                        if msg:
+                            await self.message_queue.put(msg.get('data'))
+            except Exception as e:
+                logger.error(f"Error in monitor_symbol for {symbol}: {e}")
+                logger.error(traceback.format_exc())
+            finally:
+                logger.info(f"Reconnecting to symbol stream for {symbol}...")
+                await asyncio.sleep(3)
+                await self.client.close_connection()
+                await check_closed_positions_status(symbol=symbol)
 
     async def monitor_user_data(self):
+        while True:
+            try:
+                async with self.bsm.futures_user_socket() as user_stream:
+                    while True:
+                        user_msg = await user_stream.recv()
+                        if user_msg:
+                            await self.message_queue.put(user_msg)
+            except Exception as e:
+                logger.error(f"Error in user data stream: {e}")
+                logger.error(traceback.format_exc())
+            finally:
+                logger.info("Reconnecting to user data stream...")
+                await asyncio.sleep(3)
+                await self.client.close_connection()
 
-        try:
-            async with self.bsm.futures_user_socket() as user_stream:
-                while True:
-                    user_msg = await user_stream.recv()
-                    if user_msg:
-                        await self.on_message(user_msg)
-
-        except BinanceAPIException as e:
-            logger.error(f"Binance API error in user data stream: {e}")
-        except asyncio.CancelledError:
-            logger.warning("User data stream monitoring was cancelled.")
-        except Exception as e:
-            logger.error(f"Error in user data stream: {e}")
-            logger.error(traceback.format_exc())
-        finally:
-            logger.info("Reconnecting to user data stream...")
-            await sleep(3)
-            await self.client.close_connection()
+    async def process_messages(self):
+        while True:
+            message = await self.message_queue.get()
+            await self.on_message(message)
+            self.message_queue.task_done()
 
     async def on_message(self, msg):
         event_type = msg.get('e')
@@ -167,7 +159,7 @@ class TradeMonitor:
         if current_price >= position_long.activation_price and self.state[symbol].long_trailing_price == Decimal(0):
             self.state[symbol].long_trailing_price = trailing_stop
             logger.warning(f"{symbol} -->TRAILING STOP ACTIVATED at: {round(trailing_stop, 8)}")
-            cancel_tp_order(symbol=symbol, webhook_id=position_long.webhook_id)
+            await cancel_tp_order(symbol=symbol, webhook_id=position_long.webhook_id)
             logger.warning(f" -->Cancellation of TAKE PROFIT order: {symbol}")
         elif self.state[symbol].long_trailing_price != Decimal(0):
 
