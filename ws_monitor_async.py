@@ -317,7 +317,7 @@ class TradeMonitor:
                 position_side=position_side
             )
 
-            if self.state[symbol]:
+            if symbol in self.state:
                 self.state[symbol] = SymbolPositionState(
                     long_trailing_price=0 if position_side == OrderPositionSide.LONG else self.state[
                         symbol].long_trailing_price,
