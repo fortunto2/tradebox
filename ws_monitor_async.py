@@ -317,12 +317,13 @@ class TradeMonitor:
                 position_side=position_side
             )
 
-            self.state[symbol] = SymbolPositionState(
-                long_trailing_price=0 if position_side == OrderPositionSide.LONG else self.state[
-                    symbol].long_trailing_price,
-                short_trailing_price=0 if position_side == OrderPositionSide.SHORT else self.state[
-                    symbol].short_trailing_price,
-            )
+            if self.state[symbol]:
+                self.state[symbol] = SymbolPositionState(
+                    long_trailing_price=0 if position_side == OrderPositionSide.LONG else self.state[
+                        symbol].long_trailing_price,
+                    short_trailing_price=0 if position_side == OrderPositionSide.SHORT else self.state[
+                        symbol].short_trailing_price,
+                )
 
         else:
             logger.warning(
