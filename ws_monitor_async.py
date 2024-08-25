@@ -82,6 +82,7 @@ class TradeMonitor:
         except Exception as e:
             logger.error(f"Error in monitor_symbol for {symbol}: {e}")
         finally:
+            await sleep(3)
             await self.client.close_connection()
 
     async def monitor_user_data(self):
@@ -100,6 +101,7 @@ class TradeMonitor:
         except Exception as e:
             logger.error(f"Error in user data stream: {e}")
         finally:
+            await sleep(3)
             await self.client.close_connection()
 
     async def on_message(self, msg):
