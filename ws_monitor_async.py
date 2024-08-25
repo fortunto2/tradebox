@@ -23,6 +23,7 @@ from flows.agg_trade_flow import close_positions, check_closed_positions_status
 from flows.order_filled_flow import order_filled_flow
 from flows.order_cancel_flow import order_cancel_flow
 from flows.tasks.binance_futures import get_position_closed_pnl
+from flows.tasks.orders_create import cancel_tp_order
 
 settings = get_settings()
 
@@ -156,6 +157,7 @@ class TradeMonitor:
         if current_price >= position_long.activation_price and self.state[symbol].long_trailing_price == Decimal(0):
             self.state[symbol].long_trailing_price = trailing_stop
             logger.warning(f"{symbol} Trailing stop activated at: {round(trailing_stop, 8)}")
+            cancel_tp_order(symbol=symbol, webhook_id=position_long.webhook_id)
         elif self.state[symbol].long_trailing_price != Decimal(0):
 
             if current_price >= self.state[symbol].long_trailing_price + (

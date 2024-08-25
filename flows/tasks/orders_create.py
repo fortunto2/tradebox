@@ -7,6 +7,7 @@ from time import sleep
 from prefect import task
 from sqlalchemy.orm import joinedload
 
+from core.logger import logger
 from core.models.binance_position import BinancePosition
 from core.schemas.position import LongPosition
 from core.schemas.webhook import WebhookPayload
@@ -105,6 +106,9 @@ def cancel_in_progress_orders(symbol, webhook_id, order_type: OrderType):
             print(e)
             logging.error(f"Error canceling order: {e}")
 
+def cancel_tp_order(symbol, webhook_id):
+    logger.info(f"cancel_tp_order: {symbol}, {webhook_id}")
+    cancel_in_progress_orders(symbol, webhook_id, OrderType.LONG_TAKE_PROFIT)
 
 @task
 def create_long_tp_order(
