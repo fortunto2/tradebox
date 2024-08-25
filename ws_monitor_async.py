@@ -179,6 +179,8 @@ class TradeMonitor:
                     logger.warning(f"{symbol} Trailing stop updated to: {round(new_long_trailing_stop, 8)}")
 
                     await check_closed_positions_status(symbol=symbol)
+        else:
+            logger.warning(f"{symbol} Trailing stop NOT ACTIVATED: {round(trailing_stop, 8)}")
 
         if self.state[symbol].long_trailing_price and current_price <= self.state[symbol].long_trailing_price:
             logger.warning(f">> Close positions {symbol} by LONG trailing, stop price: {round(current_price, 8)} ")
