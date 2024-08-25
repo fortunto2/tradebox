@@ -1,4 +1,5 @@
 import asyncio
+import traceback
 from asyncio import sleep
 from typing import List, Dict
 from decimal import Decimal
@@ -6,6 +7,7 @@ from decimal import Decimal
 import sentry_sdk
 from binance import AsyncClient, BinanceSocketManager
 from binance.exceptions import BinanceAPIException
+from prefect.deployments import run_deployment
 from pydantic import BaseModel, Field
 
 from core.models.binance_position import PositionStatus, BinancePosition
@@ -17,13 +19,16 @@ from core.schemas.events.account_update import UpdateData
 from config import get_settings
 from core.views.handle_positions import get_exist_position, close_position_task, update_position_task, \
     open_position_task
-from flows.order_new_flow import order_new_flow
+# from flows.order_new_flow import order_new_flow
 from core.logger import logger
-from flows.agg_trade_flow import close_positions, check_closed_positions_status
-from flows.order_filled_flow import order_filled_flow
 from flows.order_cancel_flow import order_cancel_flow
+from flows.order_new_flow import order_new_flow
+from flows.positions_flow import close_positions
+from flows.order_filled_flow import order_filled_flow
+# from flows.order_cancel_flow import order_cancel_flow
 from flows.tasks.binance_futures import get_position_closed_pnl
 from flows.tasks.orders_create import cancel_tp_order
+from flows.tasks.positions_processing import check_closed_positions_status
 
 settings = get_settings()
 
@@ -81,6 +86,7 @@ class TradeMonitor:
             logger.warning("Symbol data stream monitoring was cancelled.")
         except Exception as e:
             logger.error(f"Error in monitor_symbol for {symbol}: {e}")
+            logger.error(traceback.format_exc())
         finally:
             logger.info(f"Reconnecting to symbol stream for {symbol}...")
             await sleep(3)
@@ -101,6 +107,7 @@ class TradeMonitor:
             logger.warning("User data stream monitoring was cancelled.")
         except Exception as e:
             logger.error(f"Error in user data stream: {e}")
+            logger.error(traceback.format_exc())
         finally:
             logger.info("Reconnecting to user data stream...")
             await sleep(3)
@@ -225,11 +232,23 @@ class TradeMonitor:
         logger.warning(f"Order: {event.order_status}, {event.order_type}")
 
         if event.order_status == 'FILLED':
-            filled_order = await order_filled_flow(event=event, order_type=our_order_type)
-            if not filled_order:
-                await order_new_flow(event, our_order_type)
+            await order_filled_flow(event=event, order_type=our_order_type)
+            # await run_deployment(
+            #     name='order-filled-flow/order_filled_flow',
+            #     parameters={
+            #         "event": event.model_dump(by_alias=True),
+            #         "order_type": our_order_type
+            #     }
+            # )
+
         elif event.order_status == 'CANCELED':
             await order_cancel_flow(event)
+            # await run_deployment(
+            #     name='order-cancel-flow/order_cancel_flow',
+            #     parameters={
+            #         "event": event.model_dump(by_alias=True)
+            #     }
+            # )
         elif event.order_status == 'REJECTED':
             pass
         elif event.order_status == 'EXPIRED':
@@ -237,6 +256,13 @@ class TradeMonitor:
         elif event.order_status == 'NEW':
             if our_order_type:
                 await order_new_flow(event, our_order_type)
+                # await run_deployment(
+                #     name='order-new-flow/order_new_flow',
+                #     parameters={
+                #         "event": event.model_dump(by_alias=True),
+                #         "order_type": our_order_type
+                #     }
+                # )
 
     async def handle_account_update(self, event: UpdateData):
 
