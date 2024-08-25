@@ -4,51 +4,13 @@ from typing import List
 
 from prefect import task
 
-from flows.tasks.binance_futures import get_position_closed_pnl
 from core.models.orders import OrderType, OrderStatus, OrderPositionSide, OrderSide, Order
 from core.schemas.webhook import WebhookPayload
-from core.views.handle_orders import db_get_last_order, db_get_orders
+from core.views.handle_orders import db_get_orders
 from core.grid import update_grid
 from flows.tasks.orders_create import create_long_limit_order, \
     create_short_market_stop_order
-from core.clients.db_sync import execute_sqlmodel_query, execute_sqlmodel_query_single
-
-
-@task
-def open_short_position_loop(
-        payload: WebhookPayload,
-        webhook_id,
-        order_binance_id: str,
-):
-
-    pnl = get_position_closed_pnl(payload.symbol)
-    print("pnl:", pnl)
-
-    extramarg = Decimal(payload.settings.extramarg) - abs(pnl)
-
-    if extramarg * Decimal(payload.open.leverage) < 11:
-        # проверку что не extramarg не должен быть менее 11 долларов * плече
-        print("Not enough money")
-        return
-
-    short_order: Order = execute_sqlmodel_query_single(
-        lambda session: db_get_last_order(webhook_id, order_type=OrderType.SHORT_MARKET_STOP_OPEN, order_by='desc'))
-
-    hedge_price = Decimal(short_order.price) * (1 - Decimal(payload.settings.offset_pluse) / 100)
-
-    quantity = extramarg * Decimal(payload.open.leverage) / hedge_price
-
-    # только один раз, когда хватает денег
-    short_market_order = create_short_market_stop_order(
-        symbol=payload.symbol,
-        price=hedge_price,
-        quantity=quantity,
-        leverage=payload.open.leverage,
-        webhook_id=webhook_id,
-    )
-
-
-
+from core.clients.db_sync import execute_sqlmodel_query
 
 
 def get_grid_orders(

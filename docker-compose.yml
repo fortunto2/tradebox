@@ -63,7 +63,7 @@ services:
 
 
   prefect-server: &prefect
-    image: prefecthq/prefect:2.19.8-python3.11
+    image: prefecthq/prefect:2.20.3-python3.11
     restart: always
     ports:
       - '4200:4200'
@@ -84,7 +84,8 @@ services:
     environment:
       - PREFECT_API_URL=http://20.243.22.4:4200/api
     ports: []
-    command: prefect worker start --pool "local"
+#    command: prefect worker start --pool "local"
+    command: python flows/start_serve.py
 
   postgres:
     image: postgres:16-alpine

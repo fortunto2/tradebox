@@ -11,8 +11,7 @@ from core.clients.db_async import get_async_session, async_engine
 from core.clients.db_sync import SessionLocal, sync_engine
 from core.models.binance_position import BinancePosition
 from core.models.binance_symbol import BinanceSymbol
-# from core.clients.db_sync import sync_engine
-from flows.open_long_position import open_long_position
+from flows.positions_flow import open_long_position
 
 sentry_sdk.init(
     dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",

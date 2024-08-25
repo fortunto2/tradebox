@@ -7,9 +7,9 @@ from sqlmodel import Index
 from sqlmodel import SQLModel, Field, Relationship
 
 from core.models.base import BaseTable
-
-
 # from core.models.webhook import WebHook
+from core.models.binance_symbol import BinanceSymbol
+
 
 
 class OrderBinanceStatus(enum.Enum):
@@ -66,7 +66,7 @@ class Order(BaseTable, table=True):
     webhook: "WebHook" = Relationship(back_populates="orders")
     binance_id: Optional[str] = Field(default=None, index=True, unique=True)
     symbol: str = Field(default=None, foreign_key="binancesymbol.symbol", index=True)
-    symbol_info: "BinanceSymbol" = Relationship(back_populates="orders")
+    symbol_info: "BinanceSymbol" = Relationship(back_populates="orders", sa_relationship_kwargs={"lazy": "select"})
 
     side: OrderSide = OrderSide.BUY
     position_side: OrderPositionSide

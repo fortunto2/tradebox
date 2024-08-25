@@ -23,7 +23,7 @@ class BinancePosition(SQLModel, table=True):
     webhook: "WebHook" = Relationship(back_populates="binance_positions")
 
     symbol: str = Field(default=None, foreign_key="binancesymbol.symbol", index=True)
-    symbol_info: "BinanceSymbol" = Relationship(back_populates="positions")
+    symbol_info: "BinanceSymbol" = Relationship(back_populates="positions", sa_relationship_kwargs={"lazy": "select"})
 
     position_side: OrderPositionSide
     position_qty: Decimal = Field(default=0)

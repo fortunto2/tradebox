@@ -1,7 +1,7 @@
 import logging
 
 from prefect import task
-from sqlalchemy import func
+from sqlalchemy import func, update
 from sqlalchemy.orm import joinedload
 from sqlmodel import select
 
@@ -159,17 +159,13 @@ def db_get_order(order_id) -> Order:
 )
 def db_set_order_status(order_binance_id, status: OrderStatus, binance_status: str = None) -> Order:
     def query_func(session):
-        query = select(Order).where(Order.binance_id == order_binance_id)
-        order = session.exec(query).first()
-        if not order:
-            logger.warning(f"Order not found in DB - {order_binance_id}")
-            return None
-        order.status = status
+        stmt = update(Order).where(Order.binance_id == order_binance_id).values(status=status)
         if binance_status:
-            order.binance_status = binance_status
-        session.add(order)
+            stmt = stmt.values(binance_status=binance_status)
+
+        result = session.execute(stmt)
         session.commit()
-        return order
+        return result.rowcount > 0
 
     return execute_sqlmodel_query_single(query_func)
 

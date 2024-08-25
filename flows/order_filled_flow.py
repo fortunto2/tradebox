@@ -1,14 +1,15 @@
 from prefect import task, flow, tags
 from prefect.task_runners import ConcurrentTaskRunner
 from core.logger import logger
-from flows.agg_trade_flow import close_positions
+from flows.positions_flow import close_positions
 from core.clients.db_sync import SessionLocal
 from core.models.orders import OrderStatus, Order, OrderType, OrderSide
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.schemas.webhook import WebhookPayload
 from core.views.handle_orders import db_get_order_binance_id
 from flows.tasks.orders_create import create_short_market_stop_loss_order, create_long_tp_order
-from flows.tasks.orders_processing import open_short_position_loop, grid_make_long_limit_order, check_orders_in_the_grid
+from flows.tasks.orders_processing import grid_make_long_limit_order, check_orders_in_the_grid
+from flows.tasks.positions_processing import open_short_position_loop
 from flows.order_new_flow import order_new_flow
 
 
