@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import sentry_sdk
 from binance import AsyncClient, BinanceSocketManager
+from binance.exceptions import BinanceAPIException
 from pydantic import BaseModel, Field
 
 from core.models.binance_position import PositionStatus, BinancePosition
@@ -38,6 +39,7 @@ class SymbolPositionState(BaseModel):
     """
     long_trailing_price: Decimal = Field(default_factory=lambda: Decimal(0))
     short_trailing_price: Decimal = Field(default_factory=lambda: Decimal(0))
+    pnl_diff: Decimal = Field(default_factory=lambda: Decimal(0))
 
 
 class TradeMonitor:
@@ -49,19 +51,9 @@ class TradeMonitor:
         self.state: Dict[str, SymbolPositionState] = {symbol: SymbolPositionState() for symbol in symbols}
 
     async def start_monitor_events(self):
-        while True:
-            # try:
-            tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
-            tasks.append(self.monitor_user_data())  # Добавляем задачу для мониторинга пользовательских данных
-            await asyncio.gather(*tasks)
-            # except asyncio.CancelledError:
-            #     logger.warning("Task was cancelled!")
-            # except Exception as e:
-            #     logger.error(f"Error in monitor events: {e}")
-            # finally:
-            #     await self.client.close_connection()
-            #     logger.info("Reconnecting to the WebSocket in start_monitor_events...")
-            # #     await asyncio.sleep(1)
+        tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
+        tasks.append(self.monitor_user_data())  # Добавляем задачу для мониторинга пользовательских данных
+        await asyncio.gather(*tasks)
 
     async def monitor_symbol(self, symbol: str):
         """
@@ -74,19 +66,40 @@ class TradeMonitor:
         streams = [
             f'{symbol.lower()}@aggTrade',  # Stream для агрегированных торгов
         ]
-        async with self.bsm.futures_multiplex_socket(streams) as stream:
-            while True:
-                msg = await stream.recv()
-                if msg:
-                    await self.on_message(msg.get('data'))
+        try:
+
+            async with self.bsm.futures_multiplex_socket(streams) as stream:
+                while True:
+                    msg = await stream.recv()
+                    if msg:
+                        await self.on_message(msg.get('data'))
+
+        except BinanceAPIException as e:
+            logger.error(f"Binance API error for symbol {symbol}: {e}")
+        except asyncio.CancelledError:
+            logger.warning("Symbol data stream monitoring was cancelled.")
+        except Exception as e:
+            logger.error(f"Error in monitor_symbol for {symbol}: {e}")
+        finally:
+            await self.client.close_connection()
 
     async def monitor_user_data(self):
 
-        async with self.bsm.futures_user_socket() as user_stream:
-            while True:
-                user_msg = await user_stream.recv()
-                if user_msg:
-                    await self.on_message(user_msg)
+        try:
+           async with self.bsm.futures_user_socket() as user_stream:
+                while True:
+                    user_msg = await user_stream.recv()
+                    if user_msg:
+                        await self.on_message(user_msg)
+
+        except BinanceAPIException as e:
+            logger.error(f"Binance API error in user data stream: {e}")
+        except asyncio.CancelledError:
+            logger.warning("User data stream monitoring was cancelled.")
+        except Exception as e:
+            logger.error(f"Error in user data stream: {e}")
+        finally:
+            await self.client.close_connection()
 
     async def on_message(self, msg):
         event_type = msg.get('e')
@@ -103,13 +116,16 @@ class TradeMonitor:
     async def handle_agg_trade(self, event: AggregatedTradeEvent):
 
         current_price = Decimal(event.price)
+        old_pnl = self.state[event.symbol].pnl_diff
 
         pnl_diff = self.calculate_pnl(event.symbol, current_price)
+        if pnl_diff > old_pnl:
+            logger.warning(f"new_pnl: {pnl_diff} > {old_pnl}")
+        self.state[event.symbol].pnl_diff = pnl_diff
 
         if pnl_diff > 0:
             logger.warning(f">> Close positions {event.symbol} by PNL: {pnl_diff} USDT")
             await close_positions(event.symbol)
-            await sleep(3)
             return None
 
         # Trailing logic (asynchronous)
@@ -139,6 +155,7 @@ class TradeMonitor:
 
         if current_price >= position_long.activation_price and self.state[symbol].long_trailing_price == Decimal(0):
             self.state[symbol].long_trailing_price = trailing_stop
+            logger.warning(f"{symbol} Trailing stop activated at: {round(trailing_stop, 8)}")
         elif self.state[symbol].long_trailing_price != Decimal(0):
 
             if current_price >= self.state[symbol].long_trailing_price + (
@@ -166,7 +183,6 @@ class TradeMonitor:
             self.state[symbol] = SymbolPositionState(
                 long_trailing_price=0
             )
-            await sleep(3)  # todo: позиция не успевает в базе закрыться, надо дать время, чтоб заново не начился трейлинг
 
     async def handle_order_update(self, event: OrderTradeUpdate):
         if event.symbol not in self.symbols:
@@ -331,24 +347,13 @@ class TradeMonitor:
 
 
 async def start(symbols):
-    while True:
-        client = None
-        try:
-            client = await AsyncClient.create(
-                api_key=settings.BINANCE_API_KEY,
-                api_secret=settings.BINANCE_API_SECRET
-            )
-            trade_monitor = TradeMonitor(client, symbols)
-            await trade_monitor.start_monitor_events()
-        except asyncio.CancelledError:
-            logger.warning("Task was cancelled. Restarting...")
-        except Exception as e:
-            logger.error(f"Error in start: {e}")
-        finally:
-            logger.info("Reconnecting to the WebSocket ...")
-            await asyncio.sleep(1)
-            if client:
-                await client.close_connection()
+
+    client = await AsyncClient.create(
+        api_key=settings.BINANCE_API_KEY,
+        api_secret=settings.BINANCE_API_SECRET
+    )
+    trade_monitor = TradeMonitor(client, symbols)
+    await trade_monitor.start_monitor_events()
 
 
 import click

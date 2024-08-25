@@ -31,7 +31,7 @@ def calculate_grid_orders(payload: WebhookPayload, initial_price: Decimal) -> di
     martingale_steps = payload.settings.mg_long
     deposit = payload.settings.deposit
     leverage = payload.open.leverage
-    calculate_entry_price_start = Decimal(payload.open.entry_price)
+    calculate_entry_price_start = Decimal(initial_price)
 
     # Расчет цены Take Profit ордера от открытия позиции
     # take_profit_order_price = Decimal(initial_price) * Decimal(1 + (take_profit_percentage + Decimal(fee_percentage)) / 100)
@@ -97,19 +97,20 @@ def update_grid(
         webhook_id: int,
 ):
 
-    # order_market = db_get_last_order(
-    #     webhook_id=webhook_id, order_type=OrderType.LONG_MARKET
-    # )
-    #
-    # if order_market is None:
-    #     raise ValueError("Не найден Market ордер.")
-    #
-    # order_market_price = order_market.price
+    if not payload.open.entry_price:
+        order_market = db_get_last_order(
+            webhook_id=webhook_id, order_type=OrderType.LONG_MARKET
+        )
 
-    # Используем цену из payload для расчета сетки ордеров
-    calculate_entry_price_start = Decimal(payload.open.entry_price)
+        if order_market is None:
+            raise ValueError("Не найден Market ордер.")
 
-    #grid_orders = calculate_grid_orders(payload, order_market_price)
+        initial_price = order_market.price
+    else:
+        # Используем цену из payload для расчета сетки ордеров
+        initial_price = Decimal(payload.open.entry_price)
+
+    calculate_entry_price_start = Decimal(initial_price)
 
     grid_orders = calculate_grid_orders(payload, calculate_entry_price_start)
 
