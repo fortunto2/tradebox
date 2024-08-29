@@ -127,7 +127,9 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
                     webhook_id=order.webhook_id,
                     order_binance_id=order_binance_id,
                 )
-            elif order.type == OrderType.SHORT_MARKET and order.side == OrderSide.BUY:
+            elif order.type == OrderType.SHORT_MARKET and order.side == OrderSide.SELL:
+                # 1. SHORT_MARKET_STOP_LOSS -> SHORT_MARKET потому что не смог купиться, и он стал SHORT_MARKET
+                # 2. SHORT_MARKET(filled) - sell cобытие, и нам надо еще раз установить тригер сверху SHORT_MARKET_STOP_LOSS
                 await open_short_position_loop(
                     payload=payload,
                     webhook_id=order.webhook_id,
@@ -142,5 +144,5 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
                     position_short=position,
                     price_original=event.original_price
                 )
-                logger.info(f"Create short_stop_loss_order: {short_stop_loss_order.id}")
+                logger.info(f"Create short_stop_loss_order: {short_stop_loss_order}")
 

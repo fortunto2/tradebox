@@ -16,7 +16,7 @@ from flows.tasks.binance_futures import check_position
 
 @flow(task_runner=ConcurrentTaskRunner())
 async def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
-    with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
+    with (tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side)):
 
         logger.info(f"Order status: {event.order_status}")
         order_binance_id = str(event.order_id)
@@ -30,8 +30,20 @@ async def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
                 event.symbol,
                 webhook.id,
                 OrderPositionSide(event.position_side),
-                not_closed=True #todo: вернул обратно, тк второй раз не создается шорт позиция иначе
+                not_closed=True  # todo: вернул обратно, тк второй раз не создается шорт позиция иначе
             )
+
+            if event.order_type == 'MARKET':
+                if (event.position_side == 'LONG' and event.side == 'SELL') or \
+                        (event.position_side == 'SHORT' and event.side == 'BUY'):
+                    # это надо для последних закрывающих ордеров, инача заново позицию создают
+
+                    binance_position = get_exist_position(
+                        event.symbol,
+                        webhook.id,
+                        OrderPositionSide(event.position_side),
+                        not_closed=False
+                    )
 
             if not binance_position:
 
