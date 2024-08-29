@@ -4,8 +4,9 @@ from prefect.task_runners import ConcurrentTaskRunner
 from core.schemas.position import LongPosition, ShortPosition
 from core.schemas.webhook import WebhookPayload
 from flows.tasks.binance_futures import cancel_open_orders, check_position
-from core.models.orders import OrderSide
+from core.models.orders import OrderSide, OrderPositionSide
 from flows.tasks.orders_create import create_short_market_order, create_long_market_order
+from flows.tasks.positions_processing import check_closed_positions_status
 
 
 @flow(task_runner=ConcurrentTaskRunner())
@@ -18,7 +19,8 @@ async def close_positions(symbol: str, close_short=True, close_long=True):
 
         logger.info(f">>> Cancel all open orders: {status_cancel}")
 
-        position_long, position_short = check_position(symbol=symbol)
+        position_long, position_short = await check_closed_positions_status(symbol=symbol)
+        # position_long, position_short = check_position(symbol=symbol)
         position_long: LongPosition
         position_short: ShortPosition
 

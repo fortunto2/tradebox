@@ -99,7 +99,6 @@ class TradeMonitor:
                 # await asyncio.sleep(3)
                 await self.client.close_connection()
 
-
     async def process_messages(self):
         while True:
             message = await self.message_queue.get()
@@ -394,8 +393,8 @@ import click
 
 
 @click.command()
-@click.option("--symbol", prompt="Symbol", default="1000FLOKIUSDT", show_default=True,
-              help="Enter the trading symbol (default: 1000FLOKIUSDT)")
+@click.option("--symbol", prompt="Symbol", default="FETUSDT", show_default=True,
+              help="Enter the trading symbol (default: FETUSDT)")
 def main(symbol):
     asyncio.run(start([symbol]))
 

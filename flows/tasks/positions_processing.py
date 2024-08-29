@@ -47,6 +47,8 @@ async def check_closed_positions_status(symbol):
                 position=position_short_open_in_db
             )
 
+    return position_long, position_short
+
 
 @task
 async def open_short_position_loop(

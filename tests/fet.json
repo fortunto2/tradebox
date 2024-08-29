@@ -1,0 +1,32 @@
+{
+  "name": "TEST_FET",
+  "side": "buy",
+  "positionSide": "long",
+  "symbol": "FETUSDT",
+  "open": {
+    "enabled": true,
+    "amountType": "amount",
+    "amount": "20",
+    "leverage": "20"
+  },
+  "settings": {
+    "start": 1,
+    "deposit": 2,
+    "extramarg": 4.0,
+    "tp": "1.0",
+    "trail_1": 0.5,
+    "trail_2": 0.1,
+    "offset_short": 0.1,
+    "offset_pluse": -0.15,
+    "sl_short": 0.3,
+    "grid_long": [
+      0.05
+    ],
+    "mg_long": [
+      5.0
+    ],
+    "trail_step": 0.01,
+    "order_quan": 1,
+    "sens": 252
+  }
+}

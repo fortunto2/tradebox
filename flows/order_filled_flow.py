@@ -87,8 +87,6 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
                     close_long=False,
                     close_short=True
                 )
-            elif order.type == OrderType.SHORT_MARKET:
-                pass
             elif order.type == OrderType.LONG_MARKET and order.side == OrderSide.BUY:
                 # только первый раз в начале вебхука создаем ордеры
                 tp_order = await create_long_tp_order.submit(
@@ -124,6 +122,12 @@ async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = Non
 
             elif order.type == OrderType.SHORT_MARKET_STOP_LOSS:
                 logger.info(f"Order {order_binance_id} SHORT_MARKET_STOP_LOSS start make_hedge_by_pnl")
+                await open_short_position_loop(
+                    payload=payload,
+                    webhook_id=order.webhook_id,
+                    order_binance_id=order_binance_id,
+                )
+            elif order.type == OrderType.SHORT_MARKET and order.side == OrderSide.BUY:
                 await open_short_position_loop(
                     payload=payload,
                     webhook_id=order.webhook_id,

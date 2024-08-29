@@ -30,7 +30,7 @@ async def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
                 event.symbol,
                 webhook.id,
                 OrderPositionSide(event.position_side),
-                not_closed=False
+                not_closed=True #todo: вернул обратно, тк второй раз не создается шорт позиция иначе
             )
 
             if not binance_position:
