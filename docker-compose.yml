@@ -12,7 +12,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8006:8009"
+      - "80:8009"
     command: uvicorn main:app --reload --host 0.0.0.0 --port 8009 --forwarded-allow-ips='*' --proxy-headers
     healthcheck:
       test: wget --no-verbose -O /dev/null --tries=1 http://0.0.0.0:8009/ping || exit 1
@@ -22,45 +22,9 @@ services:
   ws-monitor:
     <<: *backend
     ports: []
-    command: python ws_monitor_async.py --symbol=1000FLOKIUSDT
+    command: python ws_monitor_async.py --symbols 1000FLOKIUSDT, FETUSDT
     healthcheck:
       test: [] # Properly defining an empty healthcheck mapping
-
-#  ws-monitor2:
-#    <<: *backend
-#    ports: []
-#    command: python ws_monitor_async.py --symbol=1000LUNCUSDT
-#    healthcheck:
-#      test: [] # Properly defining an empty healthcheck mapping
-#
-#  ws-monitor3:
-#    <<: *backend
-#    ports: []
-#    command: python ws_monitor_async.py --symbol=1000SHIBUSDT
-#    healthcheck:
-#      test: [] # Properly defining an empty healthcheck mapping
-#
-#  ws-monitor4:
-#    <<: *backend
-#    ports: []
-#    command: python ws_monitor_async.py --symbol=1000XECUSDT
-#    healthcheck:
-#      test: [] # Properly defining an empty healthcheck mapping
-#
-#  ws-monitor5:
-#    <<: *backend
-#    ports: []
-#    command: python ws_monitor_async.py --symbol=1INCHUSDT
-#    healthcheck:
-#      test: [] # Properly defining an empty healthcheck mapping
-
-  ws-monitor6:
-    <<: *backend
-    ports: []
-    command: python ws_monitor_async.py --symbol=1000PEPEUSDT
-    healthcheck:
-      test: [] # Properly defining an empty healthcheck mapping
-
 
   prefect-server: &prefect
     image: prefecthq/prefect:2.20.3-python3.11

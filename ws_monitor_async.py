@@ -393,10 +393,10 @@ import click
 
 
 @click.command()
-@click.option("--symbol", prompt="Symbol", default="FETUSDT", show_default=True,
-              help="Enter the trading symbol (default: FETUSDT)")
-def main(symbol):
-    asyncio.run(start([symbol]))
+@click.option("--symbols", prompt="Symbols", default=["FETUSDT"], show_default=True, multiple=True,
+              help="Enter one or more trading symbols (default: FETUSDT)")
+def main(symbols):
+    asyncio.run(start(symbols))
 
 
 if __name__ == '__main__':
