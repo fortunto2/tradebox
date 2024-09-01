@@ -55,6 +55,7 @@ class TradeMonitor:
         self.bsm = BinanceSocketManager(client)
 
         self.symbols = symbols
+        print(symbols)
         self.state: Dict[str, SymbolPositionState] = {symbol: SymbolPositionState() for symbol in symbols}
         self.message_queue = Queue()
 
@@ -393,9 +394,12 @@ import click
 
 
 @click.command()
-@click.option("--symbols", prompt="Symbols", default=["FETUSDT"], show_default=True, multiple=True,
+@click.option("--symbols", prompt="Symbols", default="FETUSDT", show_default=True,
               help="Enter one or more trading symbols (default: FETUSDT)")
 def main(symbols):
+    print(symbols)
+    symbols = [symbol for symbol in symbols.split(',')]
+
     asyncio.run(start(symbols))
 
 
