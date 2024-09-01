@@ -1,0 +1,10 @@
+BINANCE_API_KEY = ''
+BINANCE_API_SECRET = ''
+
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=PASSWORD
+POSTGRES_DB=tradebox
+
+DB_ASYNC_CONNECTION_STR="postgresql+asyncpg://postgres:PASSWORD@postgres:5432/tradebox"
+DB_CONNECTION_STR="postgresql://postgres:PASSWORD@postgres:5432/tradebox"
+
