@@ -22,7 +22,7 @@ services:
   ws-monitor:
     <<: *backend
     ports: []
-    command: python ws_monitor_async.py --symbols 1000FLOKIUSDT, FETUSDT
+    command: python ws_monitor_async.py --symbols 1000FLOKIUSDT,FETUSDT
     healthcheck:
       test: [] # Properly defining an empty healthcheck mapping
 
