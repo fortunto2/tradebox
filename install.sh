@@ -7,7 +7,7 @@ generate_password() {
 
 # Получаем внешний IP адрес сервера
 get_external_ip() {
-  curl -s ifconfig.me
+  curl -4 -s ifconfig.me
 }
 
 echo "Шаг 1: Установка Docker..."
