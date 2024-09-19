@@ -125,7 +125,7 @@ class TradeMonitor:
 
         pnl_diff = self.calculate_pnl(event.symbol, current_price)
         if pnl_diff > old_pnl:
-            logger.warning(f"new_pnl: {pnl_diff} > {old_pnl}")
+            logger.warning(f"new_pnl:{event.symbol} - {pnl_diff} > {old_pnl}")
         self.state[event.symbol].pnl_diff = pnl_diff
 
         if pnl_diff > 0:
