@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: revolutionapi/tradebox
+    image: isteit/tradebox
     restart: always
     volumes:
       - .:/app

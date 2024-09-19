@@ -176,10 +176,11 @@ async def receive_webhook(body: WebhookPayload, session: AsyncSession = Depends(
     position_long, _ = check_position(symbol=symbol)
     position_long: LongPosition
 
-    if float(position_long.entryPrice) > 0:
-        print(position_long)
-        print(f"Position found for symbol: {symbol}. Ignoring new webhook.")
-        return HTTPException(status_code=400, detail=f"position found for {symbol}")
+    if position_long:
+        if float(position_long.entryPrice) > 0:
+            print(position_long)
+            print(f"Position found for symbol: {symbol}. Ignoring new webhook.")
+            return HTTPException(status_code=400, detail=f"position found for {symbol}")
 
     # save webhook to db
     webhook = WebHook(
