@@ -22,7 +22,7 @@ services:
   ws-monitor:
     <<: *backend
     ports: []
-    command: python ws_monitor_async.py --symbols 1000FLOKIUSDT,FETUSDT
+    command: python ws_monitor_async.py --symbols ${SYMBOLS}
     healthcheck:
       test: [] # Properly defining an empty healthcheck mapping
 
@@ -35,8 +35,8 @@ services:
       - .env
     environment:
       - PREFECT_SERVER_API_HOST=0.0.0.0
-      - PREFECT_UI_URL=http://20.243.22.4:4200/api
-      - PREFECT_API_URL=http://20.243.22.4:4200/api
+      - PREFECT_UI_URL=${PREFECT_API_URL}
+      - PREFECT_API_URL=${PREFECT_API_URL}
       - PREFECT_API_DATABASE_ECHO=False
       - PREFECT_API_DATABASE_MIGRATE_ON_START=True
     volumes:

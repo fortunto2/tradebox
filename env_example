@@ -8,3 +8,5 @@ POSTGRES_DB=tradebox
 DB_ASYNC_CONNECTION_STR="postgresql+asyncpg://postgres:PASSWORD@postgres:5432/tradebox"
 DB_CONNECTION_STR="postgresql://postgres:PASSWORD@postgres:5432/tradebox"
 
+SYMBOLS=1000FLOKIUSDT,FETUSDT
+PREFECT_API_URL=http://20.243.22.4:4200/api
