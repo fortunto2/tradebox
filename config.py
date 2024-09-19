@@ -2,7 +2,7 @@ import os
 
 from functools import lru_cache
 from pydantic import AnyUrl, validator, PostgresDsn, field_validator
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Union
 
 from pydantic_settings import BaseSettings
 
@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     POSTGRES_PORT: str = "5432"
 
     PREFECT_API_URL: str = "http://127.0.0.1:4200/api"
+
+    SYMBOLS: Union[str, List[str]] = ["ADAUSDT"]
+
+    @field_validator('SYMBOLS', mode='before')
+    def split_symbols(cls, v):
+        return v.split(',') if isinstance(v, str) else v
 
     class Config:
         case_sensitive = True

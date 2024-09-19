@@ -390,17 +390,8 @@ async def start(symbols):
     await trade_monitor.start_monitor_events()
 
 
-import click
-
-
-@click.command()
-@click.option("--symbols", prompt="Symbols", default="FETUSDT", show_default=True,
-              help="Enter one or more trading symbols (default: FETUSDT)")
-def main(symbols):
-    print(symbols)
-    symbols = [symbol for symbol in symbols.split(',')]
-
-    asyncio.run(start(symbols))
+def main():
+    asyncio.run(start(settings.SYMBOLS))
 
 
 if __name__ == '__main__':
