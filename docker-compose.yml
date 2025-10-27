@@ -9,6 +9,7 @@ services:
     restart: always
     volumes:
       - .:/app
+      - /app/.venv  # Exclude .venv from volume mapping
     env_file:
       - .env
     ports:
