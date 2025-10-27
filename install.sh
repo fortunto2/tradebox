@@ -19,11 +19,11 @@ sudo systemctl restart docker
 
 echo "Docker установлен."
 
-echo "Шаг 2: Авторизация в Docker Hub под пользователем 'isteit'..."
-docker login -u isteit
+echo "Шаг 2: Авторизация в Docker Hub под пользователем 'user'..."
+# docker login -u user
 
 echo "Шаг 3: Загрузка файла docker-compose.yml..."
-curl -L -o docker-compose.yml "https://drive.google.com/uc?export=download&id=1M-Y5_wOE68wPV0w7bSdP0Pq-bfSBW1OW"
+# curl -L -o docker-compose.yml "https://drive.google.com/uc?export=download&id=xxxxxxxx"
 
 echo "Шаг 4: Настройка файла .env..."
 
