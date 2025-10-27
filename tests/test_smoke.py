@@ -172,6 +172,20 @@ def test_config_loading():
     print(f"✓ Config loaded: {len(settings.SYMBOLS)} symbols")
 
 
+def test_binance_client_singleton():
+    """Проверка что BinanceClientFactory возвращает один и тот же экземпляр"""
+    from flows.tasks.binance_futures import BinanceClientFactory
+
+    # Получаем client дважды
+    client1 = BinanceClientFactory.get_client()
+    client2 = BinanceClientFactory.get_client()
+
+    # Должны быть одинаковые объекты (singleton)
+    assert client1 is client2, "BinanceClientFactory should return same instance"
+    assert id(client1) == id(client2), "Client instances should have same memory address"
+    print(f"✓ Singleton working: client1 id={id(client1)}, client2 id={id(client2)}")
+
+
 if __name__ == "__main__":
     # Можно запустить напрямую
     pytest.main([__file__, "-v", "-s"])

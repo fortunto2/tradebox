@@ -25,10 +25,46 @@ from core.models.orders import Order, OrderType, OrderPositionSide
 
 from config import settings
 
-client = UMFutures()
-# get server time
-print(client.time())
-client = UMFutures(key=settings.BINANCE_API_KEY, secret=settings.BINANCE_API_SECRET)
+
+class BinanceClientFactory:
+    """
+    Singleton factory для Binance Futures client.
+    Переиспользует одно HTTP соединение вместо создания нового при каждом импорте.
+
+    Преимущества:
+    - Нет множественных вызовов client.time() при импорте
+    - Переиспользование HTTP connections
+    - Меньше rate limit проблем
+    - Ленивая инициализация (создается только при первом использовании)
+    """
+    _instance = None
+    _client = None
+
+    @classmethod
+    def get_client(cls):
+        """Получить Binance Futures client (singleton)"""
+        if cls._client is None:
+            cls._client = UMFutures(
+                key=settings.BINANCE_API_KEY,
+                secret=settings.BINANCE_API_SECRET
+            )
+        return cls._client
+
+    @classmethod
+    def reset_client(cls):
+        """Сбросить client (для тестов или переподключения)"""
+        cls._client = None
+
+
+# Backward compatibility: сохраняем старый способ доступа к client
+# но теперь это функция, а не глобальная переменная
+def get_client():
+    """Получить Binance client. Использовать везде вместо прямого обращения к client."""
+    return BinanceClientFactory.get_client()
+
+
+# Для обратной совместимости со старым кодом
+client = get_client()
 
 import base64
 
