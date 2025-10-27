@@ -17,11 +17,11 @@ class Settings(BaseSettings):
     BINANCE_API_KEY: str
     BINANCE_API_SECRET: str
 
-    DB_CONNECTION_STR: str = "postgresql://postgres:rust_admin@localhost:5432/tradebox"
-    DB_ASYNC_CONNECTION_STR: str = "postgresql+asyncpg://postgres:rust_admin@localhost:5432/tradebox"
+    DB_CONNECTION_STR: str = "sqlite+aiosqlite:///./tradebox.db"
+    DB_ASYNC_CONNECTION_STR: str = "sqlite+aiosqlite:///./tradebox.db"
 
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "rust_admin"
+    POSTGRES_PASSWORD: str = ""
     POSTGRES_DB: str = "tradebox"
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: str = "5432"
