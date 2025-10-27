@@ -1,5 +1,4 @@
 from prefect import task, flow, tags
-from prefect.task_runners import ConcurrentTaskRunner
 from core.logger import logger
 from flows.positions_flow import close_positions
 from core.clients.db_sync import SessionLocal
@@ -24,7 +23,7 @@ def handle_order_update(event):
     pass
 
 
-@flow(task_runner=ConcurrentTaskRunner())
+@flow()
 async def order_filled_flow(event: OrderTradeUpdate, order_type: OrderType = None):
     with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
         with SessionLocal() as session:

@@ -1,5 +1,4 @@
 from prefect import flow, tags, get_run_logger, task
-from prefect.task_runners import ConcurrentTaskRunner
 
 from core.schemas.position import LongPosition, ShortPosition
 from core.schemas.webhook import WebhookPayload
@@ -9,7 +8,7 @@ from flows.tasks.orders_create import create_short_market_order, create_long_mar
 from flows.tasks.positions_processing import check_closed_positions_status
 
 
-@flow(task_runner=ConcurrentTaskRunner())
+@flow()
 async def close_positions(symbol: str, close_short=True, close_long=True):
 
     with tags(symbol):
@@ -44,7 +43,7 @@ async def close_positions(symbol: str, close_short=True, close_long=True):
         return True
 
 
-@flow(task_runner=ConcurrentTaskRunner())
+@flow()
 async def open_long_position(payload: WebhookPayload, webhook_id):
     with tags(payload.symbol, webhook_id):
 

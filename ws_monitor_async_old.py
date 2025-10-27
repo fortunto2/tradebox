@@ -1,12 +1,14 @@
 import asyncio
 import traceback
-from asyncio import Queue
+from asyncio import sleep, Queue
 from typing import List, Dict
 from decimal import Decimal
 
 import sentry_sdk
+from binance import AsyncClient, BinanceSocketManager
+from binance.exceptions import BinanceAPIException
+from prefect.deployments import run_deployment
 from pydantic import BaseModel, Field
-from unicorn_binance_websocket_api import BinanceWebSocketApiManager
 
 from core.models.binance_position import PositionStatus, BinancePosition
 from core.models.orders import OrderType, OrderPositionSide, Order, OrderStatus, OrderSide
@@ -17,23 +19,24 @@ from core.schemas.events.account_update import UpdateData
 from config import get_settings
 from core.views.handle_positions import get_exist_position, close_position_task, update_position_task, \
     open_position_task
-from core.logger import logger
-# Lazy imports to avoid Prefect/Pydantic compatibility issues at module level
-# from flows.order_cancel_flow import order_cancel_flow
 # from flows.order_new_flow import order_new_flow
-# from flows.positions_flow import close_positions
-# from flows.order_filled_flow import order_filled_flow
+from core.logger import logger
+from flows.order_cancel_flow import order_cancel_flow
+from flows.order_new_flow import order_new_flow
+from flows.positions_flow import close_positions
+from flows.order_filled_flow import order_filled_flow
+# from flows.order_cancel_flow import order_cancel_flow
 from flows.tasks.binance_futures import get_position_closed_pnl
 from flows.tasks.orders_create import cancel_tp_order
 from flows.tasks.positions_processing import check_closed_positions_status
 
 settings = get_settings()
 
-# sentry_sdk.init(
-#     dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
-#     traces_sample_rate=1.0,
-#     profiles_sample_rate=1.0,
-# )
+sentry_sdk.init(
+    dsn="https://c167125710805940a14cc72b74bf2617@o103263.ingest.us.sentry.io/4507614078238720",
+    traces_sample_rate=1.0,
+    profiles_sample_rate=1.0,
+)
 
 
 class SymbolPositionState(BaseModel):
@@ -47,80 +50,116 @@ class SymbolPositionState(BaseModel):
 
 
 class TradeMonitor:
-    def __init__(self, symbols: List[str]):
-        # UNICORN WebSocket manager - handles reconnect and keepalive automatically
-        self.ubwa = BinanceWebSocketApiManager(
-            exchange="binance.com-futures",
-            output_default="UnicornFy"  # Automatically normalizes messages
-        )
+    def __init__(self, client: AsyncClient, symbols: List[str]):
+        self.client = client
+        # user_timeout - частота keepalive для listen key (в секундах)
+        # По умолчанию 5 минут, ставим 30 минут (1800 сек) для меньшей нагрузки
+        self.bsm = BinanceSocketManager(client, user_timeout=30 * 60)
 
         self.symbols = symbols
-        print(f"Monitoring symbols: {symbols}")
+        print(symbols)
         self.state: Dict[str, SymbolPositionState] = {symbol: SymbolPositionState() for symbol in symbols}
-        self.message_queue = Queue(maxsize=10000)
+        self.message_queue = Queue(maxsize=10000)  # Ограничение очереди
+        self.reconnect_delay = 3  # Начальная задержка реконнекта
 
-    async def start_monitor(self):
-        """Start monitoring all streams"""
-        # Check closed positions for all symbols
-        for symbol in self.symbols:
-            await check_closed_positions_status(symbol)
+    async def start_monitor_events(self):
+        tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
+        tasks.append(self.monitor_user_data())  # Добавляем задачу для мониторинга пользовательских данных
+        tasks.append(self.process_messages())
+        # BinanceSocketManager автоматически делает keepalive каждые 5 минут
+        await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Create aggTrade streams for each symbol
-        for symbol in self.symbols:
-            self.ubwa.create_stream(
-                ['aggTrade'],
-                [symbol.lower()],
-                stream_label=f"{symbol}_aggTrade"
-            )
-            logger.info(f"Created aggTrade stream for {symbol}")
+    async def monitor_symbol(self, symbol: str):
+        await check_closed_positions_status(symbol)
+        streams = [f'{symbol.lower()}@aggTrade']
+        retry_count = 0
+        max_delay = 60
 
-        # Create user data stream with automatic keepalive
-        self.ubwa.create_stream(
-            ['arr'],  # Account, orders, and positions updates
-            ['!userData'],
-            api_key=settings.BINANCE_API_KEY,
-            api_secret=settings.BINANCE_API_SECRET,
-            stream_label="user_data"
-        )
-        logger.info("Created user data stream")
-
-        # Start processing messages
-        await self.process_streams()
-
-    async def process_streams(self):
-        """Process messages from all streams"""
         while True:
             try:
-                # Get oldest message from stream buffer (FIFO)
-                msg = self.ubwa.pop_stream_data_from_stream_buffer()
+                async with self.bsm.futures_multiplex_socket(streams) as stream:
+                    logger.info(f"Connected to {symbol} stream")
+                    retry_count = 0  # Сброс счетчика при успешном подключении
 
-                if msg:
-                    # UnicornFy normalizes the message format
-                    await self.on_message(msg)
-                else:
-                    # Small sleep to avoid busy loop when no messages
-                    await asyncio.sleep(0.01)
-
+                    while True:
+                        try:
+                            msg = await asyncio.wait_for(stream.recv(), timeout=30.0)
+                            if msg:
+                                await self.message_queue.put(msg.get('data'))
+                        except asyncio.TimeoutError:
+                            logger.warning(f"No data from {symbol} stream for 30s, reconnecting...")
+                            break
             except Exception as e:
-                logger.error(f"Error processing stream: {e}")
+                retry_count += 1
+                logger.error(f"Error in monitor_symbol for {symbol}: {e}")
                 logger.error(traceback.format_exc())
-                await asyncio.sleep(1)
+            finally:
+                # Exponential backoff с ограничением
+                delay = min(self.reconnect_delay * (2 ** retry_count), max_delay)
+                logger.info(f"Reconnecting to symbol stream for {symbol} in {delay} seconds...")
+                await asyncio.sleep(delay)
+                await check_closed_positions_status(symbol=symbol)
+
+    async def monitor_user_data(self):
+        retry_count = 0
+        max_delay = 60
+
+        while True:
+            try:
+                async with self.bsm.futures_user_socket() as user_stream:
+                    logger.info("Connected to user data stream")
+                    retry_count = 0  # Сброс при успешном подключении
+
+                    while True:
+                        try:
+                            user_msg = await asyncio.wait_for(user_stream.recv(), timeout=30.0)
+                            if user_msg:
+                                # Проверка на истечение listen key
+                                if user_msg.get('e') == 'listenKeyExpired':
+                                    logger.warning("Listen key expired! Reconnecting...")
+                                    break
+                                await self.message_queue.put(user_msg)
+                        except asyncio.TimeoutError:
+                            logger.warning("No data from user stream for 30s, reconnecting...")
+                            break
+            except Exception as e:
+                retry_count += 1
+                logger.error(f"Error in user data stream: {e}")
+                logger.error(traceback.format_exc())
+            finally:
+                # Exponential backoff
+                delay = min(self.reconnect_delay * (2 ** retry_count), max_delay)
+                logger.info(f"Reconnecting to user data stream in {delay} seconds...")
+                await asyncio.sleep(delay)
+                try:
+                    await self.client.close_connection()
+                except Exception:
+                    pass
+
+    async def process_messages(self):
+        while True:
+            message = await self.message_queue.get()
+            try:
+                await self.on_message(message)
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+                logger.error(traceback.format_exc())
+            finally:
+                self.message_queue.task_done()
 
     async def on_message(self, msg):
-        """Route messages to appropriate handlers"""
-        event_type = msg.get('event_type')
+        event_type = msg.get('e')
 
         if event_type == 'aggTrade':
             await self.handle_agg_trade(AggregatedTradeEvent.parse_obj(msg))
         elif event_type == 'ORDER_TRADE_UPDATE':
-            await self.handle_order_update(OrderTradeUpdate.parse_obj(msg.get('order')))
+            await self.handle_order_update(OrderTradeUpdate.parse_obj(msg.get('o')))
         elif event_type == 'ACCOUNT_UPDATE':
-            await self.handle_account_update(UpdateData.parse_obj(msg.get('balances', {})))
+            await self.handle_account_update(UpdateData.parse_obj(msg['a']))
         else:
-            logger.debug(f"Unhandled event type: {event_type}")
+            logger.info(f"Unhandled event type: {event_type}")
 
     async def handle_agg_trade(self, event: AggregatedTradeEvent):
-        from flows.positions_flow import close_positions
 
         current_price = Decimal(event.price)
         old_pnl = self.state[event.symbol].pnl_diff
@@ -135,13 +174,18 @@ class TradeMonitor:
             await close_positions(event.symbol)
             return None
 
-        # Trailing logic
+        # Trailing logic (asynchronous)
         await self.handle_trailing_long(event.symbol, current_price)
 
     async def handle_trailing_long(self, symbol, current_price):
         """
         Онлайн расчет трейлинга
+        :param symbol:
+        :param current_price:
+        :return:
         """
+
+        # todo: придумать чтоб каждый раз позицию из базы не дергал
         position_long: BinancePosition = get_exist_position(
             symbol=symbol,
             position_side=OrderPositionSide.LONG,
@@ -189,8 +233,6 @@ class TradeMonitor:
                 logger.warning(f"{symbol} -->Waiting for TRAILING STOP activation UPDATE price of: {round(position_long.activation_price, 8)}")
 
         if self.state[symbol].long_trailing_price and current_price <= self.state[symbol].long_trailing_price:
-            from flows.positions_flow import close_positions
-
             logger.warning(f"--> Close positions {symbol} by LONG trailing, stop price: {round(current_price, 8)} ")
 
             await close_positions(symbol)
@@ -224,28 +266,47 @@ class TradeMonitor:
         logger.warning(f"Order: {event.order_status}, {event.order_type}")
 
         if event.order_status == 'FILLED':
-            from flows.order_filled_flow import order_filled_flow
             await order_filled_flow(event=event, order_type=our_order_type)
+            # await run_deployment(
+            #     name='order-filled-flow/order_filled_flow',
+            #     parameters={
+            #         "event": event.model_dump(by_alias=True),
+            #         "order_type": our_order_type
+            #     }
+            # )
 
         elif event.order_status == 'CANCELED':
-            from flows.order_cancel_flow import order_cancel_flow
             await order_cancel_flow(event)
+            # await run_deployment(
+            #     name='order-cancel-flow/order_cancel_flow',
+            #     parameters={
+            #         "event": event.model_dump(by_alias=True)
+            #     }
+            # )
         elif event.order_status == 'REJECTED':
             pass
         elif event.order_status == 'EXPIRED':
             pass
         elif event.order_status == 'NEW':
             if our_order_type:
-                from flows.order_new_flow import order_new_flow
                 await order_new_flow(event, our_order_type)
+                # await run_deployment(
+                #     name='order-new-flow/order_new_flow',
+                #     parameters={
+                #         "event": event.model_dump(by_alias=True),
+                #         "order_type": our_order_type
+                #     }
+                # )
 
     async def handle_account_update(self, event: UpdateData):
+
         if not event.positions:
             logger.warning("No positions found in account update")
             return None
 
         for position in event.positions:
             symbol = position.symbol
+
             await self.update_position(position, symbol)
 
     async def update_position(self, position_event: Position, symbol: str):
@@ -274,18 +335,22 @@ class TradeMonitor:
 
             # filled last order sell, sort desc
             for order in position.orders[::-1]:
+                # берем любой айдишник, щас маркет открытия позиции чтоб начать с него
                 if order.status == OrderStatus.FILLED and order.side == OrderSide.BUY:
                     order_id = order.binance_id
                     break
 
             if order_id:
-                pnl = get_position_closed_pnl(symbol=symbol)
+                pnl = get_position_closed_pnl(
+                    symbol=symbol
+                )
             else:
                 pnl = position_event.unrealized_pnl
 
             comission = self.__calculate_comission(position.orders)
             pnl -= comission
 
+            # уже закрываем во флоу close_positions
             close_position_task(
                 position=position,
                 pnl=round(pnl, 2),
@@ -309,22 +374,30 @@ class TradeMonitor:
             position.entry_price = Decimal(position_event.entry_price)
             position.entry_break_price = Decimal(position_event.breakeven_price)
 
-            update_position_task(position=position)
+            update_position_task(
+                position=position
+            )
+
+        # await check_closed_positions_status(symbol=symbol)
 
     def __calculate_comission(self, orders: List[Order]):
         commission = sum(
             order.commission for order in orders if
             order.status == OrderStatus.FILLED and order.commission
         ) * 2
+
         return commission
 
     def calculate_pnl(self, symbol: str, current_price: Decimal):
+
+        # todo вебхук бы сразу знать или айди позиции
         position_short = get_exist_position(
             symbol=symbol,
             position_side=OrderPositionSide.SHORT,
         )
 
         if position_short and position_short.position_qty != 0:
+
             position_long = get_exist_position(
                 symbol=symbol,
                 position_side=OrderPositionSide.LONG,
@@ -342,26 +415,20 @@ class TradeMonitor:
             long_pnl = (current_price - position_long.entry_price) * position_long.position_qty - commission_long
             short_pnl = (position_short.entry_price - current_price) * position_short.position_qty - commission_short
 
+            # Если есть шортовая позиция, закрываем по маркету только если она существует и PnL положительный
             if position_short and position_short.position_qty > 0:
                 return round(long_pnl + short_pnl, 2)
 
         return 0
 
-    def stop(self):
-        """Stop all streams and cleanup"""
-        logger.info("Stopping UNICORN WebSocket manager...")
-        self.ubwa.stop_manager_with_all_streams()
-
 
 async def start(symbols):
-    """Main entry point"""
-    trade_monitor = TradeMonitor(symbols)
-    try:
-        await trade_monitor.start_monitor()
-    except KeyboardInterrupt:
-        logger.info("Received interrupt signal")
-    finally:
-        trade_monitor.stop()
+    client = await AsyncClient.create(
+        api_key=settings.BINANCE_API_KEY,
+        api_secret=settings.BINANCE_API_SECRET
+    )
+    trade_monitor = TradeMonitor(client, symbols)
+    await trade_monitor.start_monitor_events()
 
 
 def main():

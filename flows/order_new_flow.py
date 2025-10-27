@@ -2,7 +2,6 @@ from asyncio import sleep
 from decimal import Decimal
 
 from prefect import flow, get_run_logger, tags
-from prefect.task_runners import ConcurrentTaskRunner
 
 from core.clients.db_sync import SessionLocal
 from core.logger import logger
@@ -14,7 +13,7 @@ from core.views.handle_positions import get_exist_position, open_position_task
 from flows.tasks.binance_futures import check_position
 
 
-@flow(task_runner=ConcurrentTaskRunner())
+@flow()
 async def order_new_flow(event: OrderTradeUpdate, order_type: OrderType):
     with (tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side)):
 
