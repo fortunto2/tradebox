@@ -1,24 +1,36 @@
-FROM python:3.10 AS base
+FROM python:3.13-slim
 
-ARG YOUR_ENV
+ENV PYTHONFAULTHANDLER=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONHASHSEED=random \
+    UV_VERSION=0.9.5
 
-ENV YOUR_ENV=${YOUR_ENV} \
-  PYTHONFAULTHANDLER=1 \
-  PYTHONUNBUFFERED=1 \
-  PYTHONHASHSEED=random \
-  PIP_NO_CACHE_DIR=off \
-  PIP_DISABLE_PIP_VERSION_CHECK=on \
-  PIP_DEFAULT_TIMEOUT=100 \
-  POETRY_VERSION=1.8.2 \
-  POETRY_CACHE_DIR=/tmp/poetry_cache \
-  POETRY_VIRTUALENVS_CREATE=0
+# Install system dependencies
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-FROM base AS install
-# System deps:
-RUN pip install "poetry==$POETRY_VERSION"
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/${UV_VERSION}/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
 
-# Copy only requirements to cache them in docker layer
+# Set working directory
 WORKDIR /app
-COPY . /app/
 
-RUN poetry install --no-root && rm -rf $POETRY_CACHE_DIR
+# Copy project files
+COPY pyproject.toml uv.lock ./
+COPY . .
+
+# Install dependencies and project
+RUN uv sync --frozen --no-dev
+
+# Add virtual environment to PATH
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH=/app
+
+# Expose port
+EXPOSE 8009
+
+# Default command - can be overridden in docker-compose
+CMD ["python", "main.py"]

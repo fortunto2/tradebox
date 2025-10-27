@@ -1,5 +1,61 @@
+# Logs
 *.log
 *.log.*
 app.log.*
+
+# Database
 *.db
+*.sqlite
+
+# Environment
 .env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Alembic
+migrations/versions/*.pyc
+
+# Temporary files
+*.tmp
+tmp/
+temp/
