@@ -1,0 +1,357 @@
+2025-10-27 23:31:04,060 - root - ERROR - Error in user data stream: APIError(code=-2015): Invalid API-key, IP, or permissions for action, request ip: 149.50.244.185
+2025-10-27 23:31:04,174 - root - ERROR - Traceback (most recent call last):
+  File "/Users/rustam/projects/tradebox/ws_monitor_async.py", line 109, in monitor_user_data
+    async with self.bsm.futures_user_socket() as user_stream:
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 92, in __aenter__
+    await self.connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 113, in connect
+    await self._before_connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 61, in _before_connect
+    self._listen_key = await self._get_listen_key()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 104, in _get_listen_key
+    listen_key = await self._client.futures_stream_get_listen_key()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 2083, in futures_stream_get_listen_key
+    res = await self._request_futures_api(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "post", "listenKey", signed=False, data={}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 216, in _request_futures_api
+    return await self._request(method, uri, signed, force_params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 178, in _request
+    return await self._handle_response(response)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 186, in _handle_response
+    raise BinanceAPIException(response, response.status, await response.text())
+binance.exceptions.BinanceAPIException: APIError(code=-2015): Invalid API-key, IP, or permissions for action, request ip: 149.50.244.185
+
+2025-10-27 23:31:04,175 - root - INFO - Reconnecting to user data stream in 6 seconds...
+2025-10-27 23:31:10,176 - root - ERROR - Error in user data stream: Session is closed
+2025-10-27 23:31:10,181 - root - ERROR - Traceback (most recent call last):
+  File "/Users/rustam/projects/tradebox/ws_monitor_async.py", line 109, in monitor_user_data
+    async with self.bsm.futures_user_socket() as user_stream:
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 92, in __aenter__
+    await self.connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 113, in connect
+    await self._before_connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 61, in _before_connect
+    self._listen_key = await self._get_listen_key()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 104, in _get_listen_key
+    listen_key = await self._client.futures_stream_get_listen_key()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 2083, in futures_stream_get_listen_key
+    res = await self._request_futures_api(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "post", "listenKey", signed=False, data={}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 216, in _request_futures_api
+    return await self._request(method, uri, signed, force_params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 170, in _request
+    async with getattr(self.session, method)(
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        yarl.URL(uri, encoded=True),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ) as response:
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 1517, in __aenter__
+    self._resp: _RetType = await self._coro
+                           ^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 529, in _request
+    raise RuntimeError("Session is closed")
+RuntimeError: Session is closed
+
+2025-10-27 23:31:10,182 - root - INFO - Reconnecting to user data stream in 12 seconds...
+2025-10-27 23:31:22,184 - root - ERROR - Error in user data stream: Session is closed
+2025-10-27 23:31:22,192 - root - ERROR - Traceback (most recent call last):
+  File "/Users/rustam/projects/tradebox/ws_monitor_async.py", line 109, in monitor_user_data
+    async with self.bsm.futures_user_socket() as user_stream:
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 92, in __aenter__
+    await self.connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 113, in connect
+    await self._before_connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 61, in _before_connect
+    self._listen_key = await self._get_listen_key()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 104, in _get_listen_key
+    listen_key = await self._client.futures_stream_get_listen_key()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 2083, in futures_stream_get_listen_key
+    res = await self._request_futures_api(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "post", "listenKey", signed=False, data={}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 216, in _request_futures_api
+    return await self._request(method, uri, signed, force_params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 170, in _request
+    async with getattr(self.session, method)(
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        yarl.URL(uri, encoded=True),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ) as response:
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 1517, in __aenter__
+    self._resp: _RetType = await self._coro
+                           ^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 529, in _request
+    raise RuntimeError("Session is closed")
+RuntimeError: Session is closed
+
+2025-10-27 23:31:22,195 - root - INFO - Reconnecting to user data stream in 24 seconds...
+2025-10-27 23:31:31,730 - root - ERROR - Error in user data stream: APIError(code=-2015): Invalid API-key, IP, or permissions for action, request ip: 149.50.244.185
+2025-10-27 23:31:31,843 - root - ERROR - Traceback (most recent call last):
+  File "/Users/rustam/projects/tradebox/ws_monitor_async.py", line 109, in monitor_user_data
+    async with self.bsm.futures_user_socket() as user_stream:
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 92, in __aenter__
+    await self.connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 113, in connect
+    await self._before_connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 61, in _before_connect
+    self._listen_key = await self._get_listen_key()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 104, in _get_listen_key
+    listen_key = await self._client.futures_stream_get_listen_key()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 2083, in futures_stream_get_listen_key
+    res = await self._request_futures_api(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "post", "listenKey", signed=False, data={}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 216, in _request_futures_api
+    return await self._request(method, uri, signed, force_params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 178, in _request
+    return await self._handle_response(response)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 186, in _handle_response
+    raise BinanceAPIException(response, response.status, await response.text())
+binance.exceptions.BinanceAPIException: APIError(code=-2015): Invalid API-key, IP, or permissions for action, request ip: 149.50.244.185
+
+2025-10-27 23:31:31,844 - root - INFO - Reconnecting to user data stream in 6 seconds...
+2025-10-27 23:31:37,846 - root - ERROR - Error in user data stream: Session is closed
+2025-10-27 23:31:37,853 - root - ERROR - Traceback (most recent call last):
+  File "/Users/rustam/projects/tradebox/ws_monitor_async.py", line 109, in monitor_user_data
+    async with self.bsm.futures_user_socket() as user_stream:
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 92, in __aenter__
+    await self.connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 113, in connect
+    await self._before_connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 61, in _before_connect
+    self._listen_key = await self._get_listen_key()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 104, in _get_listen_key
+    listen_key = await self._client.futures_stream_get_listen_key()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 2083, in futures_stream_get_listen_key
+    res = await self._request_futures_api(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "post", "listenKey", signed=False, data={}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 216, in _request_futures_api
+    return await self._request(method, uri, signed, force_params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 170, in _request
+    async with getattr(self.session, method)(
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        yarl.URL(uri, encoded=True),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ) as response:
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 1517, in __aenter__
+    self._resp: _RetType = await self._coro
+                           ^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 529, in _request
+    raise RuntimeError("Session is closed")
+RuntimeError: Session is closed
+
+2025-10-27 23:31:37,855 - root - INFO - Reconnecting to user data stream in 12 seconds...
+2025-10-27 23:31:49,856 - root - ERROR - Error in user data stream: Session is closed
+2025-10-27 23:31:49,866 - root - ERROR - Traceback (most recent call last):
+  File "/Users/rustam/projects/tradebox/ws_monitor_async.py", line 109, in monitor_user_data
+    async with self.bsm.futures_user_socket() as user_stream:
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 92, in __aenter__
+    await self.connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 113, in connect
+    await self._before_connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 61, in _before_connect
+    self._listen_key = await self._get_listen_key()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 104, in _get_listen_key
+    listen_key = await self._client.futures_stream_get_listen_key()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 2083, in futures_stream_get_listen_key
+    res = await self._request_futures_api(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "post", "listenKey", signed=False, data={}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 216, in _request_futures_api
+    return await self._request(method, uri, signed, force_params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 170, in _request
+    async with getattr(self.session, method)(
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        yarl.URL(uri, encoded=True),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ) as response:
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 1517, in __aenter__
+    self._resp: _RetType = await self._coro
+                           ^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 529, in _request
+    raise RuntimeError("Session is closed")
+RuntimeError: Session is closed
+
+2025-10-27 23:31:49,870 - root - INFO - Reconnecting to user data stream in 24 seconds...
+2025-10-27 23:32:13,872 - root - ERROR - Error in user data stream: Session is closed
+2025-10-27 23:32:13,876 - root - ERROR - Traceback (most recent call last):
+  File "/Users/rustam/projects/tradebox/ws_monitor_async.py", line 109, in monitor_user_data
+    async with self.bsm.futures_user_socket() as user_stream:
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 92, in __aenter__
+    await self.connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 113, in connect
+    await self._before_connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 61, in _before_connect
+    self._listen_key = await self._get_listen_key()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 104, in _get_listen_key
+    listen_key = await self._client.futures_stream_get_listen_key()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 2083, in futures_stream_get_listen_key
+    res = await self._request_futures_api(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "post", "listenKey", signed=False, data={}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 216, in _request_futures_api
+    return await self._request(method, uri, signed, force_params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 170, in _request
+    async with getattr(self.session, method)(
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        yarl.URL(uri, encoded=True),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ) as response:
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 1517, in __aenter__
+    self._resp: _RetType = await self._coro
+                           ^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 529, in _request
+    raise RuntimeError("Session is closed")
+RuntimeError: Session is closed
+
+2025-10-27 23:32:13,877 - root - INFO - Reconnecting to user data stream in 48 seconds...
+2025-10-27 23:33:01,879 - root - ERROR - Error in user data stream: Session is closed
+2025-10-27 23:33:01,887 - root - ERROR - Traceback (most recent call last):
+  File "/Users/rustam/projects/tradebox/ws_monitor_async.py", line 109, in monitor_user_data
+    async with self.bsm.futures_user_socket() as user_stream:
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 92, in __aenter__
+    await self.connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 113, in connect
+    await self._before_connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 61, in _before_connect
+    self._listen_key = await self._get_listen_key()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 104, in _get_listen_key
+    listen_key = await self._client.futures_stream_get_listen_key()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 2083, in futures_stream_get_listen_key
+    res = await self._request_futures_api(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "post", "listenKey", signed=False, data={}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 216, in _request_futures_api
+    return await self._request(method, uri, signed, force_params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 170, in _request
+    async with getattr(self.session, method)(
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        yarl.URL(uri, encoded=True),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        **kwargs,
+        ^^^^^^^^^
+    ) as response:
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 1517, in __aenter__
+    self._resp: _RetType = await self._coro
+                           ^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/aiohttp/client.py", line 529, in _request
+    raise RuntimeError("Session is closed")
+RuntimeError: Session is closed
+
+2025-10-27 23:33:01,890 - root - INFO - Reconnecting to user data stream in 60 seconds...
+2025-10-27 23:34:42,299 - root - ERROR - Error in user data stream: APIError(code=-2015): Invalid API-key, IP, or permissions for action, request ip: 149.50.244.185
+2025-10-27 23:34:42,415 - root - ERROR - Traceback (most recent call last):
+  File "/Users/rustam/projects/tradebox/ws_monitor_async.py", line 109, in monitor_user_data
+    async with self.bsm.futures_user_socket() as user_stream:
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 92, in __aenter__
+    await self.connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/reconnecting_websocket.py", line 113, in connect
+    await self._before_connect()
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 61, in _before_connect
+    self._listen_key = await self._get_listen_key()
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/ws/keepalive_websocket.py", line 104, in _get_listen_key
+    listen_key = await self._client.futures_stream_get_listen_key()
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 2083, in futures_stream_get_listen_key
+    res = await self._request_futures_api(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        "post", "listenKey", signed=False, data={}
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 216, in _request_futures_api
+    return await self._request(method, uri, signed, force_params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 178, in _request
+    return await self._handle_response(response)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/rustam/projects/tradebox/.venv/lib/python3.14/site-packages/binance/async_client.py", line 186, in _handle_response
+    raise BinanceAPIException(response, response.status, await response.text())
+binance.exceptions.BinanceAPIException: APIError(code=-2015): Invalid API-key, IP, or permissions for action, request ip: 149.50.244.185
+
+2025-10-27 23:34:42,416 - root - INFO - Reconnecting to user data stream in 6 seconds...

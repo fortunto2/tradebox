@@ -52,59 +52,100 @@ class SymbolPositionState(BaseModel):
 class TradeMonitor:
     def __init__(self, client: AsyncClient, symbols: List[str]):
         self.client = client
-        self.bsm = BinanceSocketManager(client)
+        # user_timeout - частота keepalive для listen key (в секундах)
+        # По умолчанию 5 минут, ставим 30 минут (1800 сек) для меньшей нагрузки
+        self.bsm = BinanceSocketManager(client, user_timeout=30 * 60)
 
         self.symbols = symbols
         print(symbols)
         self.state: Dict[str, SymbolPositionState] = {symbol: SymbolPositionState() for symbol in symbols}
-        self.message_queue = Queue()
+        self.message_queue = Queue(maxsize=10000)  # Ограничение очереди
+        self.reconnect_delay = 3  # Начальная задержка реконнекта
 
     async def start_monitor_events(self):
         tasks = [self.monitor_symbol(symbol) for symbol in self.symbols]
         tasks.append(self.monitor_user_data())  # Добавляем задачу для мониторинга пользовательских данных
         tasks.append(self.process_messages())
-        await asyncio.gather(*tasks)
+        # BinanceSocketManager автоматически делает keepalive каждые 5 минут
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     async def monitor_symbol(self, symbol: str):
         await check_closed_positions_status(symbol)
         streams = [f'{symbol.lower()}@aggTrade']
+        retry_count = 0
+        max_delay = 60
+
         while True:
             try:
                 async with self.bsm.futures_multiplex_socket(streams) as stream:
+                    logger.info(f"Connected to {symbol} stream")
+                    retry_count = 0  # Сброс счетчика при успешном подключении
+
                     while True:
-                        msg = await stream.recv()
-                        if msg:
-                            await self.message_queue.put(msg.get('data'))
+                        try:
+                            msg = await asyncio.wait_for(stream.recv(), timeout=30.0)
+                            if msg:
+                                await self.message_queue.put(msg.get('data'))
+                        except asyncio.TimeoutError:
+                            logger.warning(f"No data from {symbol} stream for 30s, reconnecting...")
+                            break
             except Exception as e:
+                retry_count += 1
                 logger.error(f"Error in monitor_symbol for {symbol}: {e}")
                 logger.error(traceback.format_exc())
             finally:
-                logger.info(f"Reconnecting to symbol stream for {symbol}...")
-                # await asyncio.sleep(3)
-                # await self.client.close_connection()
+                # Exponential backoff с ограничением
+                delay = min(self.reconnect_delay * (2 ** retry_count), max_delay)
+                logger.info(f"Reconnecting to symbol stream for {symbol} in {delay} seconds...")
+                await asyncio.sleep(delay)
                 await check_closed_positions_status(symbol=symbol)
 
     async def monitor_user_data(self):
+        retry_count = 0
+        max_delay = 60
+
         while True:
             try:
                 async with self.bsm.futures_user_socket() as user_stream:
+                    logger.info("Connected to user data stream")
+                    retry_count = 0  # Сброс при успешном подключении
+
                     while True:
-                        user_msg = await user_stream.recv()
-                        if user_msg:
-                            await self.message_queue.put(user_msg)
+                        try:
+                            user_msg = await asyncio.wait_for(user_stream.recv(), timeout=30.0)
+                            if user_msg:
+                                # Проверка на истечение listen key
+                                if user_msg.get('e') == 'listenKeyExpired':
+                                    logger.warning("Listen key expired! Reconnecting...")
+                                    break
+                                await self.message_queue.put(user_msg)
+                        except asyncio.TimeoutError:
+                            logger.warning("No data from user stream for 30s, reconnecting...")
+                            break
             except Exception as e:
+                retry_count += 1
                 logger.error(f"Error in user data stream: {e}")
                 logger.error(traceback.format_exc())
             finally:
-                logger.info("Reconnecting to user data stream...")
-                # await asyncio.sleep(3)
-                await self.client.close_connection()
+                # Exponential backoff
+                delay = min(self.reconnect_delay * (2 ** retry_count), max_delay)
+                logger.info(f"Reconnecting to user data stream in {delay} seconds...")
+                await asyncio.sleep(delay)
+                try:
+                    await self.client.close_connection()
+                except Exception:
+                    pass
 
     async def process_messages(self):
         while True:
             message = await self.message_queue.get()
-            await self.on_message(message)
-            self.message_queue.task_done()
+            try:
+                await self.on_message(message)
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+                logger.error(traceback.format_exc())
+            finally:
+                self.message_queue.task_done()
 
     async def on_message(self, msg):
         event_type = msg.get('e')

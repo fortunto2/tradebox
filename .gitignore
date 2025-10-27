@@ -3,3 +3,6 @@
 .env
 *.db
 _old/
+*.pyc
+__pycache__/
+.DS_Store

@@ -1,13 +1,12 @@
 from prefect import flow, tags
-from prefect.task_runners import ConcurrentTaskRunner, SequentialTaskRunner
+from prefect.task_runners import ConcurrentTaskRunner
 from core.logger import logger
 from core.models.orders import OrderStatus, Order
 from core.schemas.events.order_trade_update import OrderTradeUpdate
 from core.views.handle_orders import db_set_order_status
 
 
-# @flow(task_runner=ConcurrentTaskRunner())
-@flow(task_runner=SequentialTaskRunner())
+@flow(task_runner=ConcurrentTaskRunner())
 async def order_cancel_flow(event: OrderTradeUpdate):
     # with tags(event.symbol, event.order_type, event.order_status, event.position_side, event.side):
 
