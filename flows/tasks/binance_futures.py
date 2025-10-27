@@ -57,6 +57,7 @@ def get_symbol_info(symbol):
 
 
 from decimal import Decimal, ROUND_DOWN
+from functools import lru_cache
 
 
 def adjust_precision(value, precision):
@@ -64,7 +65,13 @@ def adjust_precision(value, precision):
     return value.quantize(Decimal(quantize_str), rounding=ROUND_DOWN)
 
 
+@lru_cache(maxsize=128)
 def get_symbol_quantity_and_precisions(symbol):
+    """
+    Получает precision данные для символа с кэшированием в памяти.
+    Кэш: 128 символов (достаточно для большинства случаев).
+    Данные практически никогда не меняются, поэтому безопасно кэшировать.
+    """
     def query_func(session_local):
         query = select(BinanceSymbol).where(BinanceSymbol.symbol == symbol)
         result = session_local.exec(query)

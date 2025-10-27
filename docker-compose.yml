@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: isteit/tradebox
+    image: tradebox
     restart: always
     volumes:
       - .:/app
