@@ -9,6 +9,9 @@ ENV PYTHONFAULTHANDLER=1 \
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
     curl \
+    gcc \
+    libpq-dev \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
