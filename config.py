@@ -28,6 +28,10 @@ class Settings(BaseSettings):
 
     PREFECT_API_URL: str = "http://127.0.0.1:4200/api"
 
+    SENTRY_DSN: str = ""
+    SENTRY_TRACES_SAMPLE_RATE: float = 1.0
+    SENTRY_PROFILES_SAMPLE_RATE: float = 1.0
+
     SYMBOLS: Union[str, List[str]] = ["ADAUSDT"]
 
     @field_validator('SYMBOLS', mode='before')
